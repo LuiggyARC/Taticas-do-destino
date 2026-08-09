@@ -1,8 +1,8 @@
 # Táticas do Destino
 
-**Táticas do Destino** é um protótipo de jogo tático/RPG por turno desenvolvido em **Godot 4.6**, com foco em combate em grade, movimentação por metros, sistema de turnos, IA inimiga, ataques de oportunidade, menu inicial e sistema de save.
+**Táticas do Destino** é um protótipo de jogo tático/RPG por turnos desenvolvido em **Godot 4.6**, com foco em combate em grade, movimentação por metros, criação de personagem, progressão de nível, IA inimiga, ataques de oportunidade, interface de batalha e sistema de save.
 
-O projeto começou como um estudo prático de Godot/GDScript e está sendo construído passo a passo, com objetivo de evoluir para um RPG tático de tabuleiro com fases, terreno, cobertura, vantagem de posição e progressão do jogador.
+O projeto começou como um estudo prático de Godot/GDScript e está sendo construído passo a passo, com objetivo de evoluir para um RPG tático de tabuleiro com fases, raças, classes, terreno, cobertura, vantagem de posição, habilidades, itens e progressão do jogador.
 
 ---
 
@@ -12,14 +12,18 @@ Protótipo funcional em desenvolvimento.
 
 Já existe uma base jogável com:
 
-- tabuleiro 2D em grade;
+- tabuleiro 2D em grade 15x15;
 - herói controlável;
 - inimigo com IA simples/tática;
 - movimentação por distância em metros;
 - combate corpo a corpo;
 - ataque de oportunidade;
-- interface básica de combate;
+- criação de personagem antes do início do jogo;
+- sistema de níveis com XP total acumulado;
+- nível máximo 20;
+- HUD de batalha horizontal, compacta e semi-transparente;
 - menu inicial;
+- tela de configurações;
 - autosave e saves manuais;
 - carregamento de saves pelo menu.
 
@@ -46,6 +50,8 @@ res://
     main.gd
     main_menu.tscn
     main_menu.gd
+    character_creation.tscn
+    character_creation.gd
     game_state.gd
 
     units/
@@ -60,13 +66,29 @@ res://
 
 ---
 
+## Fluxo atual do jogo
+
+```text
+Menu Inicial
+  ↓ Iniciar
+Criação de Personagem
+  ↓ Confirmar personagem
+Combate / Stage atual
+  ↓ Salvar, Abandonar ou Continuar progressão
+Menu Inicial / Saves
+```
+
+O botão **Iniciar** não abre mais o combate diretamente. Agora ele leva o jogador para a tela de criação de personagem.
+
+---
+
 ## Sistemas implementados
 
 ### 1. Cena principal do jogo
 
-Foi criada uma cena principal chamada `main.tscn`, responsável por carregar o tabuleiro, o herói, o inimigo, a interface de combate e os sistemas principais.
+A cena principal `main.tscn` carrega o tabuleiro, o herói, o inimigo, a interface de combate e os sistemas principais.
 
-A cena principal contém atualmente:
+A cena contém atualmente:
 
 ```text
 Main
@@ -87,9 +109,10 @@ Ele centraliza a lógica de:
 - turnos;
 - combate;
 - IA inimiga;
-- interface;
+- interface de batalha;
 - save/load;
-- início de stage.
+- início de stage;
+- aplicação dos dados do personagem.
 
 ---
 
@@ -107,9 +130,7 @@ const GRID_HEIGHT := 15
 
 Cada casa possui 64x64 pixels na tela.
 
-Visualmente, o tabuleiro é formado por quadrados verdes alternados, criando um efeito de grade.
-
-O mapa atual representa uma arena simples para testes de movimentação e combate.
+Visualmente, o tabuleiro é formado por quadrados verdes alternados, criando um efeito de grade. O mapa atual funciona como arena de teste para movimentação, combate e IA.
 
 ---
 
@@ -140,17 +161,34 @@ const STRAIGHT_MOVE_COST := 1.5
 const DIAGONAL_MOVE_COST := 3.0
 ```
 
-Esse sistema permite criar personagens com deslocamentos diferentes, como:
-
-```text
-Guerreiro: 9m
-Mago: 6m
-Inimigo básico: 6m
-```
+Esse sistema permite criar personagens com deslocamentos diferentes, como 6m, 7,5m, 9m, 10,5m ou 12m por turno.
 
 ---
 
-### 4. Herói
+### 4. Criação de personagem
+
+Foi adicionada uma tela antes do início do jogo:
+
+```text
+Scene/character_creation.tscn
+Scene/character_creation.gd
+```
+
+A tela permite definir dados iniciais do personagem antes de entrar no combate.
+
+Funcionalidades atuais:
+
+- escolha de nome do personagem;
+- escolha de classe inicial;
+- prévia de atributos;
+- botão para confirmar e iniciar o jogo;
+- botão para voltar ao menu inicial.
+
+Ao confirmar, os dados escolhidos são armazenados no `GameState` e aplicados ao herói no início da fase.
+
+---
+
+### 5. Herói
 
 O herói foi criado como uma cena própria:
 
@@ -159,29 +197,90 @@ Scene/units/Hero.tscn
 Scene/units/hero.gd
 ```
 
-Características atuais:
-
-```text
-HP máximo: 100
-Dano: 20
-Movimento máximo: 9m
-Posição inicial: 7,7
-```
-
 O herói é representado visualmente por um quadrado azul criado por código.
 
-Funções principais do herói:
+Dados atuais controlados pelo herói:
+
+```text
+Nome
+Classe
+HP máximo
+HP atual
+Ataque
+Movimento máximo
+Movimento atual
+Nível
+XP total
+XP necessário para o próximo nível
+Nível máximo
+```
+
+Funções principais:
 
 - atualizar posição no mundo;
 - receber dano;
 - morrer;
 - resetar movimento;
 - resetar ataque normal;
-- resetar ataque de oportunidade.
+- resetar ataque de oportunidade;
+- aplicar dados do personagem;
+- ganhar XP;
+- calcular nível pelo XP total;
+- subir de nível;
+- calcular progresso de XP no nível atual.
 
 ---
 
-### 5. Inimigo
+### 6. Sistema de níveis
+
+Foi implementado um sistema de progressão baseado em **XP total acumulado**.
+
+Regras atuais:
+
+```text
+Nível máximo: 20
+Nível 1 → 2: 1000 XP total
+A partir daí, cada faixa de nível multiplica a exigência anterior por 1.5
+```
+
+Exemplo:
+
+```text
+Nível 1 → 2: +1000 XP | total 1000
+Nível 2 → 3: +1500 XP | total 2500
+Nível 3 → 4: +2250 XP | total 4750
+Nível 4 → 5: +3375 XP | total 8125
+Nível 5 → 6: +5063 XP | total 13188
+```
+
+O sistema guarda:
+
+```text
+level
+total_xp
+xp_to_next_level
+max_level
+```
+
+A HUD mostra o progresso do nível atual, por exemplo:
+
+```text
+Nv 2 | XP 0/1500
+```
+
+Ao subir de nível, atualmente o herói recebe aumento básico de atributos:
+
+```text
++10 HP máximo
++2 ataque
++1,5m de movimento a cada 3 níveis
+```
+
+Esses valores são provisórios e poderão ser ajustados quando o sistema completo de raças e classes for implementado.
+
+---
+
+### 7. Inimigo
 
 O inimigo foi criado como uma cena própria:
 
@@ -201,7 +300,7 @@ Posição inicial: 10,7
 
 O inimigo é representado visualmente por um quadrado vermelho criado por código.
 
-Funções principais do inimigo:
+Funções principais:
 
 - atualizar posição no mundo;
 - receber dano;
@@ -211,7 +310,7 @@ Funções principais do inimigo:
 
 ---
 
-### 6. Movimento do herói
+### 8. Movimento do herói
 
 O jogador pode mover o herói clicando nas casas do tabuleiro.
 
@@ -240,7 +339,7 @@ O jogador pode continuar andando enquanto ainda tiver deslocamento disponível.
 
 ---
 
-### 7. Área de movimentação visível
+### 9. Área de movimentação visível
 
 Foi criada uma camada visual para mostrar as casas alcançáveis pelo personagem.
 
@@ -258,33 +357,49 @@ Herói com 0m → nenhuma casa de movimento disponível.
 
 ---
 
-### 8. Interface de combate
+### 10. HUD de batalha
 
-Foi criada uma interface básica em `CanvasLayer`, gerada por código.
+A interface de combate foi reformulada para uma HUD retangular horizontal, compacta e semi-transparente, posicionada próxima ao rodapé da tela.
 
-A interface mostra:
+A HUD mostra:
 
+- nome do personagem;
+- classe atual;
+- nível;
+- XP do nível atual;
+- vida atual e máxima;
+- movimento atual e máximo;
 - turno atual;
-- HP do herói;
-- movimento restante do herói;
 - HP do inimigo;
-- botão Atacar;
-- botão Terminar Turno;
-- botão Salvar;
-- botão Abandonar.
+- botões de ação.
 
 Botões atuais:
 
 ```text
-Atacar
+Ataque
+Magia
+Itens
 Terminar Turno
 Salvar
-Abandonar
+Sair
 ```
+
+Estado atual dos botões:
+
+```text
+Ataque: funcional
+Magia: placeholder/desativado
+Itens: placeholder/desativado
+Terminar Turno: funcional
+Salvar: funcional
+Sair: funcional, com confirmação
+```
+
+A HUD substituiu a interface vertical anterior e ocupa menos espaço visual no mapa.
 
 ---
 
-### 9. Sistema de turnos
+### 11. Sistema de turnos
 
 O jogo usa um `enum` para controlar o turno atual.
 
@@ -320,7 +435,7 @@ Ao iniciar um novo turno do herói:
 
 ---
 
-### 10. Combate básico
+### 12. Combate básico
 
 O herói pode atacar o inimigo se estiver adjacente.
 
@@ -336,23 +451,19 @@ O ataque pode atingir:
 - vertical;
 - diagonal.
 
-O herói causa atualmente:
-
-```text
-20 de dano
-```
-
-O inimigo causa atualmente:
-
-```text
-10 de dano
-```
-
 Cada personagem só pode fazer um ataque normal por turno.
+
+Quando o inimigo é derrotado, o herói recebe XP. Atualmente, para teste do sistema de nível, o inimigo concede:
+
+```text
+1000 XP
+```
+
+Esse valor será balanceado futuramente por tipo de inimigo, desafio ou stage.
 
 ---
 
-### 11. Ataque de oportunidade
+### 13. Ataque de oportunidade
 
 Foi implementada a regra de ataque de oportunidade.
 
@@ -375,7 +486,7 @@ Cada personagem só pode realizar um ataque de oportunidade por turno.
 
 ---
 
-### 12. IA inimiga
+### 14. IA inimiga
 
 Foi criada uma IA inimiga baseada em pontuação.
 
@@ -403,7 +514,7 @@ Esses valores ainda são planejamento, mas a estrutura já existe para evoluir a
 
 ---
 
-### 13. Menu inicial
+### 15. Menu inicial
 
 Foi criada uma tela inicial em:
 
@@ -423,14 +534,39 @@ Sair
 
 Funções atuais:
 
-- **Iniciar:** começa um jogo novo;
+- **Iniciar:** abre a criação de personagem;
 - **Continuar:** abre a tela/lista de saves;
-- **Configurações:** ainda não implementado;
+- **Configurações:** abre tela de configurações;
 - **Sair:** fecha o jogo.
 
 ---
 
-### 14. Sistema global GameState
+### 16. Configurações
+
+O botão **Configurações** abre uma tela própria dentro do menu inicial.
+
+Opções implementadas:
+
+- volume geral do jogo;
+- volume dos efeitos;
+- idioma;
+- créditos;
+- salvar configurações;
+- voltar.
+
+As configurações são salvas em:
+
+```text
+user://settings.json
+```
+
+O volume geral usa o bus `Master`.
+
+O volume dos efeitos usa o bus `SFX`. Caso o bus `SFX` não exista, o jogo cria esse bus em tempo de execução.
+
+---
+
+### 17. Sistema global GameState
 
 Foi criado um Autoload chamado:
 
@@ -448,9 +584,12 @@ Função atual:
 
 - guardar se o jogo deve carregar save;
 - guardar qual arquivo de save foi escolhido;
-- guardar o stage selecionado.
+- guardar o stage selecionado;
+- guardar dados do personagem criado;
+- guardar nível e XP;
+- guardar presets atuais do herói.
 
-Estrutura esperada:
+Dados atuais esperados:
 
 ```gdscript
 extends Node
@@ -458,11 +597,23 @@ extends Node
 var should_load_save: bool = false
 var selected_save_path: String = ""
 var selected_stage: int = 1
+
+var player_name: String = "Herói"
+var player_class: String = "Guerreiro"
+
+var hero_level: int = 1
+var hero_total_xp: int = 0
+var hero_xp_to_next_level: int = 1000
+var hero_max_level: int = 20
+
+var hero_max_hp: int = 100
+var hero_attack_power: int = 20
+var hero_max_movement_meters: float = 9.0
 ```
 
 ---
 
-### 15. Sistema de stages
+### 18. Sistema de stages
 
 O jogo já possui estrutura para iniciar fases.
 
@@ -491,7 +642,7 @@ Stage 2 - estrutura inicial de exemplo
 
 ---
 
-### 16. Sistema de save
+### 19. Sistema de save
 
 O sistema de save foi dividido em dois tipos:
 
@@ -502,7 +653,7 @@ Save Manual
 
 #### AutoSave
 
-Criado ao abandonar a partida ou fechar o jogo.
+Criado ao abandonar a partida.
 
 Caminho:
 
@@ -540,7 +691,7 @@ Permitir que o jogador tenha saves antigos separados.
 
 ---
 
-### 17. Tela de seleção de saves
+### 20. Tela de seleção de saves
 
 O botão **Continuar** abre uma tela com a lista de saves disponíveis.
 
@@ -560,14 +711,14 @@ Ao escolher um save:
 
 ---
 
-### 18. Botão Abandonar com confirmação
+### 21. Botão Sair/Abandonar com confirmação
 
-O botão **Abandonar** agora abre um popup de confirmação.
+O botão de saída da batalha abre um popup de confirmação.
 
 Fluxo:
 
 ```text
-Jogador clica em Abandonar
+Jogador clica em Sair/Abandonar
   aparece popup: deseja salvar e voltar ao menu?
 
 Não
@@ -584,12 +735,17 @@ Sim
 
 O save não grava o estado exato do combate.
 
-Ele grava apenas:
+Ele grava o progresso principal do personagem e da fase:
 
 ```json
 {
   "current_stage": 1,
   "player_presets": {
+    "player_name": "Herói",
+    "player_class": "Guerreiro",
+    "hero_level": 1,
+    "hero_total_xp": 0,
+    "hero_xp_to_next_level": 1000,
     "hero_max_hp": 100,
     "hero_attack_power": 20,
     "hero_max_movement_meters": 9.0
@@ -606,14 +762,16 @@ Esse modelo foi escolhido para evitar abuso de save no meio da luta e manter o d
 1. Abra o projeto no Godot.
 2. Execute a cena principal pelo botão Play.
 3. No menu, clique em **Iniciar**.
-4. Clique nas casas azuis para mover o herói.
-5. Aproxime-se do inimigo.
-6. Clique em **Atacar** quando estiver adjacente.
-7. Clique em **Terminar Turno** para passar a vez.
-8. O inimigo executará sua IA.
-9. Use **Salvar** para criar um save manual.
-10. Use **Abandonar** para gerar autosave e voltar ao menu.
-11. Use **Continuar** para escolher AutoSave ou saves manuais.
+4. Crie o personagem.
+5. Confirme para começar o jogo.
+6. Clique nas casas azuis para mover o herói.
+7. Aproxime-se do inimigo.
+8. Clique em **Ataque** quando estiver adjacente.
+9. Clique em **Terminar Turno** para passar a vez.
+10. O inimigo executará sua IA.
+11. Use **Salvar** para criar um save manual.
+12. Use **Sair/Abandonar** para gerar autosave e voltar ao menu.
+13. Use **Continuar** para escolher AutoSave ou saves manuais.
 
 ---
 
@@ -622,7 +780,7 @@ Esse modelo foi escolhido para evitar abuso de save no meio da luta e manter o d
 ```text
 Casa reta: 1,5m
 Casa diagonal: 3,0m
-Herói: 9m por turno
+Herói: conforme personagem criado/preset atual
 Inimigo: 6m por turno
 ```
 
@@ -636,23 +794,50 @@ A movimentação é consumida a cada clique.
 Ataque corpo a corpo: alcance 1 casa
 Ataque normal: 1 vez por turno
 Ataque de oportunidade: 1 vez por turno
-Herói: 20 de dano
-Inimigo: 10 de dano
+XP por inimigo derrotado: 1000 XP temporário para teste
+```
+
+---
+
+## Regras atuais de nível
+
+```text
+Nível inicial: 1
+Nível máximo: 20
+XP total para nível 2: 1000
+Multiplicador de exigência por nível: 1.5
+```
+
+Progressão inicial:
+
+```text
+Nível 1 → 2: +1000 XP | total 1000
+Nível 2 → 3: +1500 XP | total 2500
+Nível 3 → 4: +2250 XP | total 4750
+Nível 4 → 5: +3375 XP | total 8125
 ```
 
 ---
 
 ## Próximos passos planejados
 
+### Raças e classes
+
+- implementar raças básicas;
+- aplicar bônus raciais;
+- criar classes básicas completas;
+- definir dado de vida por classe;
+- definir deslocamento por raça;
+- definir vantagens raciais;
+- criar atributos principais: Força, Destreza, Constituição, Inteligência, Sabedoria e Carisma.
+
 ### Sistemas de gameplay
 
 - criar múltiplos inimigos;
-- criar classes de herói;
-- criar arqueiro, mago e guerreiro;
 - implementar alcance diferente por arma;
 - implementar magias;
 - implementar itens;
-- implementar XP e progressão;
+- implementar CA real;
 - criar tela de vitória e derrota;
 - criar mudança real de stages.
 
@@ -677,47 +862,37 @@ Inimigo: 10 de dano
 
 ### Interface
 
-- melhorar HUD;
-- criar tela de configurações;
-- criar tela de seleção de fase;
-- criar tela de seleção de personagem;
-- criar tela de carregamento manual mais bonita;
-- mostrar dano flutuante;
-- mostrar preview do custo de movimento.
+- melhorar visual da HUD;
+- adicionar retrato do personagem;
+- criar tooltip de habilidades;
+- criar menu de magia;
+- criar menu de itens;
+- criar tela de ficha do personagem;
+- melhorar tela de criação de personagem.
 
-### Arte e apresentação
+### Progressão
 
-- substituir quadrados por sprites;
-- criar tiles de cenário;
-- adicionar animações;
-- adicionar efeitos de ataque;
-- adicionar música e efeitos sonoros;
-- criar identidade visual do menu.
-
----
-
-## Objetivo do projeto
-
-O objetivo é evoluir este protótipo para um RPG tático por turnos inspirado em jogos de tabuleiro, onde posicionamento, terreno, cobertura, vantagem de altura e gerenciamento de ações sejam importantes para vencer.
-
-Este projeto também serve como prática de:
-
-- Godot;
-- GDScript;
-- lógica de jogos por turno;
-- sistemas de movimentação em grade;
-- IA baseada em pontuação;
-- organização de projeto;
-- versionamento com Git/GitHub.
+- balancear XP por inimigo;
+- criar recompensas por stage;
+- implementar evolução por classe;
+- criar talentos;
+- criar perícias;
+- salvar raça, classe, atributos e habilidades.
 
 ---
 
-## Repositório
+## Créditos
 
-Projeto mantido por **LuiggyARC**.
-
-Repositório:
+Desenvolvimento:
 
 ```text
-https://github.com/LuiggyARC/Taticas-do-destino
+Luiggy Alberto
 ```
+
+Engine:
+
+```text
+Godot 4.6
+```
+
+Projeto criado como estudo prático de desenvolvimento de jogos táticos, GDScript, sistemas de RPG e organização de projeto em GitHub.
