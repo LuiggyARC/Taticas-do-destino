@@ -6,6 +6,8 @@ const GRID_HEIGHT := 15
 
 const STRAIGHT_MOVE_COST := 1.5
 const DIAGONAL_MOVE_COST := 3.0
+const SETTINGS_PATH := "user://settings.json"
+const SFX_BUS_NAME := "SFX"
 const SAVE_PATH := "user://savegame.json"
 const AUTOSAVE_PATH := "user://autosave.json"
 const MANUAL_SAVE_DIR := "user://manual_saves/"
@@ -29,6 +31,18 @@ var enemy: Node2D
 var save_button: Button
 var abandon_button: Button
 var abandon_confirm_popup: ConfirmationDialog
+var settings_popup: PopupPanel
+var credits_popup: AcceptDialog
+
+var master_volume_slider: HSlider
+var sfx_volume_slider: HSlider
+var language_option: OptionButton
+
+var settings_data := {
+	"master_volume": 100.0,
+	"sfx_volume": 100.0,
+	"language": "pt"
+}
 
 
 func save_manual_game():
@@ -55,14 +69,18 @@ func save_manual_game():
 	var save_path := MANUAL_SAVE_DIR + file_name
 	
 	var save_data := {
-		"current_stage": current_stage,
-		"player_presets": {
-			"hero_max_hp": hero.max_hp if is_instance_valid(hero) else 100,
-			"hero_attack_power": hero.attack_power if is_instance_valid(hero) else 20,
-			"hero_max_movement_meters": hero.max_movement_meters if is_instance_valid(hero) else 9.0
-		}
+	"current_stage": current_stage,
+	"player_presets": {
+		"player_name": hero.character_name if is_instance_valid(hero) else GameState.player_name,
+		"player_class": hero.character_class if is_instance_valid(hero) else GameState.player_class,
+		"hero_level": hero.level if is_instance_valid(hero) else GameState.hero_level,
+		"hero_total_xp": hero.total_xp if is_instance_valid(hero) else GameState.hero_total_xp,
+		"hero_xp_to_next_level": hero.xp_to_next_level if is_instance_valid(hero) else GameState.hero_xp_to_next_level,
+		"hero_max_hp": hero.max_hp if is_instance_valid(hero) else GameState.hero_max_hp,
+		"hero_attack_power": hero.attack_power if is_instance_valid(hero) else GameState.hero_attack_power,
+		"hero_max_movement_meters": hero.max_movement_meters if is_instance_valid(hero) else GameState.hero_max_movement_meters
 	}
-	
+}
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
 	
 	if file == null:
@@ -78,10 +96,12 @@ func save_auto_game():
 	var save_data := {
 		"current_stage": current_stage,
 		"player_presets": {
-			"hero_max_hp": hero.max_hp if is_instance_valid(hero) else 100,
-			"hero_attack_power": hero.attack_power if is_instance_valid(hero) else 20,
-			"hero_max_movement_meters": hero.max_movement_meters if is_instance_valid(hero) else 9.0
-		}
+	"player_name": GameState.player_name,
+	"player_class": GameState.player_class,
+	"hero_max_hp": hero.max_hp if is_instance_valid(hero) else 100,
+	"hero_attack_power": hero.attack_power if is_instance_valid(hero) else 20,
+	"hero_max_movement_meters": hero.max_movement_meters if is_instance_valid(hero) else 9.0
+}
 	}
 	
 	var file := FileAccess.open(AUTOSAVE_PATH, FileAccess.WRITE)
@@ -131,16 +151,21 @@ func load_progress():
 	
 	current_stage = int(save_data.get("current_stage", 1))
 	loaded_player_presets = save_data.get("player_presets", {})
-	
-	print("Save carregado: ", save_path)
-	print("Stage salvo: ", current_stage)
-	
+	GameState.player_name = str(loaded_player_presets.get("player_name", "Herói"))
+	GameState.player_class = str(loaded_player_presets.get("player_class", "Guerreiro"))
+
+	GameState.hero_level = int(loaded_player_presets.get("hero_level", 1))
+	GameState.hero_total_xp = int(loaded_player_presets.get("hero_total_xp", 0))
+	GameState.hero_xp_to_next_level = int(loaded_player_presets.get("hero_xp_to_next_level", 1000))
+
+	GameState.hero_max_hp = int(loaded_player_presets.get("hero_max_hp", 100))
+	GameState.hero_attack_power = int(loaded_player_presets.get("hero_attack_power", 20))
+	GameState.hero_max_movement_meters = float(loaded_player_presets.get("hero_max_movement_meters", 9.0))
 func _ready():
 	create_grid_layer()
 	create_movement_layer()
 	draw_grid()
 	create_ui()
-	
 	
 	hero = $Hero
 	enemy = $Enemy
@@ -151,7 +176,7 @@ func _ready():
 		current_stage = 1
 	
 	start_stage(current_stage)
-
+	
 func create_grid_layer():
 	grid_layer = Node2D.new()
 	grid_layer.name = "GridLayer"
@@ -179,61 +204,95 @@ func draw_grid():
 			grid_layer.add_child(tile)
 
 func create_ui():
-	
 	ui_layer = CanvasLayer.new()
 	ui_layer.name = "UILayer"
 	add_child(ui_layer)
 	
-	
 	var panel := Panel.new()
-	panel.name = "MovementPanel"
-	panel.size = Vector2(320, 210)
-	panel.position = Vector2(20, 20)
+	panel.name = "BattleHUD"
+	panel.position = Vector2(20, 700)
+	panel.size = Vector2(850, 170)
 	ui_layer.add_child(panel)
 	
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.0, 0.0, 0.0, 0.55)
+	panel_style.border_color = Color(1.0, 1.0, 1.0, 0.25)
+	panel_style.border_width_left = 1
+	panel_style.border_width_top = 1
+	panel_style.border_width_right = 1
+	panel_style.border_width_bottom = 1
+	panel_style.corner_radius_top_left = 8
+	panel_style.corner_radius_top_right = 8
+	panel_style.corner_radius_bottom_left = 8
+	panel_style.corner_radius_bottom_right = 8
+	panel.add_theme_stylebox_override("panel", panel_style)
+	
+	# DADOS DO HERÓI
 	movement_label = Label.new()
 	movement_label.name = "MovementLabel"
-	movement_label.position = Vector2(12, 10)
-	movement_label.size = Vector2(290, 70)
+	movement_label.position = Vector2(20, 15)
+	movement_label.size = Vector2(360, 70)
+	movement_label.add_theme_color_override("font_color", Color.WHITE)
 	panel.add_child(movement_label)
 	
+	# DADOS DO INIMIGO
 	enemy_label = Label.new()
 	enemy_label.name = "EnemyLabel"
-	enemy_label.position = Vector2(12, 80)
-	enemy_label.size = Vector2(290, 40)
+	enemy_label.position = Vector2(430, 15)
+	enemy_label.size = Vector2(360, 70)
+	enemy_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.85))
 	panel.add_child(enemy_label)
+	
+	# LINHA DE BOTÕES
+	var button_row := HBoxContainer.new()
+	button_row.name = "ButtonRow"
+	button_row.position = Vector2(20, 105)
+	button_row.size = Vector2(810, 45)
+	button_row.add_theme_constant_override("separation", 10)
+	panel.add_child(button_row)
 	
 	attack_button = Button.new()
 	attack_button.name = "AttackButton"
-	attack_button.text = "Atacar"
-	attack_button.position = Vector2(12, 130)
-	attack_button.size = Vector2(130, 35)
+	attack_button.text = "Ataque"
+	attack_button.custom_minimum_size = Vector2(110, 38)
 	attack_button.pressed.connect(hero_attack)
-	panel.add_child(attack_button)
+	button_row.add_child(attack_button)
+	
+	var magic_button := Button.new()
+	magic_button.name = "MagicButton"
+	magic_button.text = "Magia"
+	magic_button.custom_minimum_size = Vector2(110, 38)
+	magic_button.disabled = true
+	button_row.add_child(magic_button)
+	
+	var items_button := Button.new()
+	items_button.name = "ItemsButton"
+	items_button.text = "Itens"
+	items_button.custom_minimum_size = Vector2(110, 38)
+	items_button.disabled = true
+	button_row.add_child(items_button)
 	
 	end_turn_button = Button.new()
 	end_turn_button.name = "EndTurnButton"
 	end_turn_button.text = "Terminar Turno"
-	
-	end_turn_button.position = Vector2(155, 130)
-	end_turn_button.size = Vector2(140, 35)
+	end_turn_button.custom_minimum_size = Vector2(150, 38)
 	end_turn_button.pressed.connect(end_hero_turn)
-	panel.add_child(end_turn_button)
+	button_row.add_child(end_turn_button)
+	
 	save_button = Button.new()
 	save_button.name = "SaveButton"
 	save_button.text = "Salvar"
-	save_button.position = Vector2(12, 180)
-	save_button.size = Vector2(130, 35)
+	save_button.custom_minimum_size = Vector2(110, 38)
 	save_button.pressed.connect(save_manual_game)
-	panel.add_child(save_button)
-
+	button_row.add_child(save_button)
+	
 	abandon_button = Button.new()
 	abandon_button.name = "AbandonButton"
-	abandon_button.text = "Abandonar"
-	abandon_button.position = Vector2(155, 180)
-	abandon_button.size = Vector2(140, 35)
+	abandon_button.text = "Sair"
+	abandon_button.custom_minimum_size = Vector2(110, 38)
 	abandon_button.pressed.connect(show_abandon_confirmation)
-	panel.add_child(abandon_button)
+	button_row.add_child(abandon_button)
+	
 	abandon_confirm_popup = ConfirmationDialog.new()
 	abandon_confirm_popup.name = "AbandonConfirmPopup"
 	abandon_confirm_popup.title = "Abandonar partida"
@@ -243,27 +302,7 @@ func create_ui():
 	abandon_confirm_popup.size = Vector2(420, 160)
 	abandon_confirm_popup.confirmed.connect(confirm_abandon_game)
 	ui_layer.add_child(abandon_confirm_popup)
-
-func update_movement_label():
-	var turn_text = "Turno do Herói"
 	
-	if current_turn == TurnState.ENEMY_TURN:
-		turn_text = "Turno do Inimigo"
-	
-	if is_instance_valid(hero):
-		movement_label.text = (
-			turn_text + "\n" +
-			"Herói HP: " + str(hero.hp) + "/" + str(hero.max_hp) + "\n" +
-			"Movimento: " + str(hero.current_movement_meters) + "/" + str(hero.max_movement_meters) + "m"
-		)
-	else:
-		movement_label.text = "Herói derrotado"
-	
-	if is_instance_valid(enemy):
-		enemy_label.text = "Inimigo HP: " + str(enemy.hp) + "/" + str(enemy.max_hp)
-	else:
-		enemy_label.text = "Inimigo derrotado"
-
 func _unhandled_input(event):
 	if event is InputEventMouseButton:
 		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -382,11 +421,14 @@ func hero_attack():
 	if distance <= 1:
 		enemy.take_damage(hero.attack_power)
 		hero.has_attacked = true
+		
+		if not is_instance_valid(enemy) or enemy.hp <= 0:
+			grant_hero_xp(1000)
+		
 		update_movement_label()
 	else:
 		print("Inimigo fora de alcance.")
 		print("Aproxime-se para atacar.")
-
 func get_attack_distance(from_position: Vector2i, to_position: Vector2i) -> int:
 	var dx = abs(to_position.x - from_position.x)
 	var dy = abs(to_position.y - from_position.y)
@@ -612,15 +654,49 @@ func apply_player_presets():
 	if not is_instance_valid(hero):
 		return
 	
-	if loaded_player_presets.is_empty():
-		return
+	var player_name := GameState.player_name
+	var player_class := GameState.player_class
 	
-	hero.max_hp = int(loaded_player_presets.get("hero_max_hp", hero.max_hp))
-	hero.attack_power = int(loaded_player_presets.get("hero_attack_power", hero.attack_power))
-	hero.max_movement_meters = float(loaded_player_presets.get("hero_max_movement_meters", hero.max_movement_meters))
+	var loaded_level := GameState.hero_level
+	var loaded_total_xp := GameState.hero_total_xp
+	var loaded_xp_to_next_level := GameState.hero_xp_to_next_level
 	
-	hero.hp = hero.max_hp
-	hero.current_movement_meters = hero.max_movement_meters
+	var loaded_max_hp := GameState.hero_max_hp
+	var loaded_attack_power := GameState.hero_attack_power
+	var loaded_max_movement := GameState.hero_max_movement_meters
+	
+	if GameState.should_load_save and not loaded_player_presets.is_empty():
+		player_name = str(loaded_player_presets.get("player_name", "Herói"))
+		player_class = str(loaded_player_presets.get("player_class", "Guerreiro"))
+		
+		loaded_level = int(loaded_player_presets.get("hero_level", 1))
+		loaded_total_xp = int(loaded_player_presets.get("hero_total_xp", 0))
+		loaded_xp_to_next_level = int(loaded_player_presets.get("hero_xp_to_next_level", 1000))
+		
+		loaded_max_hp = int(loaded_player_presets.get("hero_max_hp", 100))
+		loaded_attack_power = int(loaded_player_presets.get("hero_attack_power", 20))
+		loaded_max_movement = float(loaded_player_presets.get("hero_max_movement_meters", 9.0))
+	
+	hero.apply_character_data(
+		player_name,
+		player_class,
+		loaded_level,
+		loaded_total_xp,
+		loaded_xp_to_next_level,
+		loaded_max_hp,
+		loaded_attack_power,
+		loaded_max_movement
+	)
+	
+	GameState.player_name = hero.character_name
+	GameState.player_class = hero.character_class
+	GameState.hero_level = hero.level
+	GameState.hero_total_xp = hero.total_xp
+	GameState.hero_xp_to_next_level = hero.xp_to_next_level
+	GameState.hero_max_hp = hero.max_hp
+	GameState.hero_attack_power = hero.attack_power
+	GameState.hero_max_movement_meters = hero.max_movement_meters
+
 func show_abandon_confirmation():
 	abandon_confirm_popup.popup_centered()
 
@@ -629,3 +705,43 @@ func confirm_abandon_game():
 	GameState.should_load_save = false
 	GameState.selected_save_path = ""
 	get_tree().change_scene_to_file("res://Scene/main_menu.tscn")
+func grant_hero_xp(amount: int):
+	if not is_instance_valid(hero):
+		return
+	
+	hero.gain_xp(amount)
+	
+	GameState.hero_level = hero.level
+	GameState.hero_total_xp = hero.total_xp
+	GameState.hero_xp_to_next_level = hero.xp_to_next_level
+	GameState.hero_max_hp = hero.max_hp
+	GameState.hero_attack_power = hero.attack_power
+	GameState.hero_max_movement_meters = hero.max_movement_meters
+	
+	update_movement_label()
+
+func update_movement_label():
+	var turn_text := "Seu turno"
+	
+	if current_turn == TurnState.ENEMY_TURN:
+		turn_text = "Turno do inimigo"
+	
+	if is_instance_valid(hero):
+		movement_label.text = (
+			hero.character_name + " - " + hero.character_class + "\n" +
+			"Nv " + str(hero.level) + " | XP " + str(hero.get_xp_progress_in_current_level()) + "/" + str(hero.get_xp_needed_for_current_level()) + "\n" +
+			"Vida " + str(hero.hp) + "/" + str(hero.max_hp) + " | Mov " + str(hero.current_movement_meters) + "/" + str(hero.max_movement_meters)
+		)
+	else:
+		movement_label.text = "Herói derrotado"
+	
+	if is_instance_valid(enemy):
+		enemy_label.text = (
+			turn_text + "\n" +
+			"Inimigo " + str(enemy.hp) + "/" + str(enemy.max_hp)
+		)
+	else:
+		enemy_label.text = (
+			turn_text + "\n" +
+			"Inimigo derrotado"
+		)
