@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://4k48q7g8uq01"]
+
+[ext_resource type="Script" uid="uid://dcgnqthq8k7c5" path="res://Scene/main.gd" id="1_f6udf"]
+[ext_resource type="PackedScene" uid="uid://cbpt48cv27hha" path="res://Scene/units/Hero.tscn" id="2_sblpm"]
+[ext_resource type="PackedScene" uid="uid://rb0nsw3sgebv" path="res://Scene/units/Enemy.tscn" id="3_r34rm"]
+
+[node name="Main" type="Node2D" unique_id=2030190648]
+script = ExtResource("1_f6udf")
+
+[node name="Hero" parent="." unique_id=740223493 instance=ExtResource("2_sblpm")]
+
+[node name="Enemy" parent="." unique_id=821569108 instance=ExtResource("3_r34rm")]

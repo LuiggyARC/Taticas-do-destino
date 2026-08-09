@@ -1,0 +1,48 @@
+[gd_scene format=3 uid="uid://bsks5mgia1ck8"]
+
+[ext_resource type="Script" uid="uid://cy1835ntwaoo6" path="res://Scene/main_menu.gd" id="1_ftydy"]
+
+[node name="MainMenu" type="Control" unique_id=1727498774]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 21.0
+offset_right = 10.0
+offset_bottom = 21.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ftydy")
+
+[node name="PanelContainer" type="PanelContainer" parent="." unique_id=879170176]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MenuContainer" type="VBoxContainer" parent="PanelContainer" unique_id=487038430]
+custom_minimum_size = Vector2(300, 300)
+layout_mode = 2
+
+[node name="Titulo" type="Label" parent="PanelContainer/MenuContainer" unique_id=65811233]
+layout_mode = 2
+text = "Táticas do Destino"
+
+[node name="Start BT" type="Button" parent="PanelContainer/MenuContainer" unique_id=988766405]
+layout_mode = 2
+text = "Iniciar"
+
+[node name="Continue BT" type="Button" parent="PanelContainer/MenuContainer" unique_id=1224447427]
+layout_mode = 2
+text = "Continuar"
+
+[node name="Config BT" type="Button" parent="PanelContainer/MenuContainer" unique_id=222261841]
+layout_mode = 2
+text = "Configurações"
+
+[node name="Sair BT" type="Button" parent="PanelContainer/MenuContainer" unique_id=751470559]
+layout_mode = 2
+text = "Sair"
