@@ -1,8 +1,8 @@
 # Táticas do Destino
 
-**Táticas do Destino** é um protótipo de jogo tático/RPG por turnos desenvolvido em **Godot 4.6**, com foco em combate em grade, movimentação por metros, criação de personagem, progressão de nível, IA inimiga, ataques de oportunidade, interface de batalha e sistema de save.
+**Táticas do Destino** é um protótipo de RPG tático por turnos desenvolvido em **Godot 4.6**, com foco em combate em grade, movimentação por metros, criação de personagem, raças, classes, armas, CA, testes de resistência, habilidades de classe, IA inimiga, ataques de oportunidade, HUD de batalha e sistema de save.
 
-O projeto começou como um estudo prático de Godot/GDScript e está sendo construído passo a passo, com objetivo de evoluir para um RPG tático de tabuleiro com fases, raças, classes, terreno, cobertura, vantagem de posição, habilidades, itens e progressão do jogador.
+O projeto começou como um estudo prático de **Godot/GDScript** e está sendo desenvolvido passo a passo, com o objetivo de evoluir para um RPG tático inspirado em regras de RPG de mesa, com progressão de personagem, fases, inimigos, habilidades, equipamentos, magias, terreno, cobertura e decisões táticas.
 
 ---
 
@@ -10,22 +10,34 @@ O projeto começou como um estudo prático de Godot/GDScript e está sendo const
 
 Protótipo funcional em desenvolvimento.
 
-Já existe uma base jogável com:
+A base atual já possui:
 
 - tabuleiro 2D em grade 15x15;
+- escala de distância em metros;
+- movimentação reta e diagonal com custos diferentes;
 - herói controlável;
-- inimigo com IA simples/tática;
-- movimentação por distância em metros;
-- combate corpo a corpo;
+- inimigo com IA tática básica;
+- sistema de turnos;
+- ataques corpo a corpo e à distância;
+- sistema de armas com dados de dano, alcance, crítico e recarga;
+- classe de armadura normal, de toque e desprevenida;
+- testes de resistência: Fortitude, Reflexos e Vontade;
+- bônus base de ataque por tipo de classe;
+- criação de personagem com raça e classe;
+- seleção de bônus humano;
+- rolagem ou valor fixo de vida por classe;
+- sistema de XP e níveis até o nível 20;
+- habilidades iniciais de classe;
+- fúria do Bárbaro com duração;
+- redução de dano do Bárbaro;
+- Destruir o Mal do Paladino ativado por botão;
+- bônus de Sabedoria na CA para Monge;
+- ataque furtivo do Ladino em condição vulnerável temporária;
 - ataque de oportunidade;
-- criação de personagem antes do início do jogo;
-- sistema de níveis com XP total acumulado;
-- nível máximo 20;
-- HUD de batalha horizontal, compacta e semi-transparente;
+- autosave e saves manuais;
 - menu inicial;
 - tela de configurações;
-- autosave e saves manuais;
-- carregamento de saves pelo menu.
+- HUD horizontal de batalha.
 
 ---
 
@@ -36,7 +48,7 @@ Já existe uma base jogável com:
 - **Renderização:** Mobile
 - **Resolução base:** 1024x1024
 - **Linguagem:** GDScript
-- **Cena principal:** Menu inicial
+- **Cena principal:** menu inicial
 - **Autoload:** `GameState`
 
 ---
@@ -72,53 +84,19 @@ res://
 Menu Inicial
   ↓ Iniciar
 Criação de Personagem
-  ↓ Confirmar personagem
+  ↓ Escolha de nome, raça, classe e vida
 Combate / Stage atual
-  ↓ Salvar, Abandonar ou Continuar progressão
+  ↓ Salvar, abandonar ou continuar progressão
 Menu Inicial / Saves
 ```
 
-O botão **Iniciar** não abre mais o combate diretamente. Agora ele leva o jogador para a tela de criação de personagem.
+O botão **Iniciar** leva para a tela de criação de personagem. Após confirmar a criação, os dados são salvos no `GameState` e aplicados ao herói no início da fase.
 
 ---
 
-## Sistemas implementados
+## Sistema de tabuleiro
 
-### 1. Cena principal do jogo
-
-A cena principal `main.tscn` carrega o tabuleiro, o herói, o inimigo, a interface de combate e os sistemas principais.
-
-A cena contém atualmente:
-
-```text
-Main
-  Hero
-  Enemy
-```
-
-O script principal é:
-
-```text
-Scene/main.gd
-```
-
-Ele centraliza a lógica de:
-
-- criação da grade;
-- movimentação;
-- turnos;
-- combate;
-- IA inimiga;
-- interface de batalha;
-- save/load;
-- início de stage;
-- aplicação dos dados do personagem.
-
----
-
-### 2. Tabuleiro 15x15
-
-O jogo possui um tabuleiro gerado por código.
+O jogo usa um tabuleiro 2D gerado por código.
 
 Configuração atual:
 
@@ -128,30 +106,23 @@ const GRID_WIDTH := 15
 const GRID_HEIGHT := 15
 ```
 
-Cada casa possui 64x64 pixels na tela.
-
-Visualmente, o tabuleiro é formado por quadrados verdes alternados, criando um efeito de grade. O mapa atual funciona como arena de teste para movimentação, combate e IA.
+Cada casa possui 64x64 pixels e representa uma posição tática no campo de batalha.
 
 ---
 
-### 3. Sistema de escala em metros
+## Escala de movimento
 
-Foi definido que cada casa do tabuleiro equivale a:
+A escala adotada é:
 
 ```text
 1 casa = 1,5 metros
 ```
 
-O movimento reto custa:
+Custos atuais:
 
 ```text
-1,5m
-```
-
-O movimento diagonal custa:
-
-```text
-3,0m
+Movimento reto: 1,5m
+Movimento diagonal: 3,0m
 ```
 
 Constantes usadas:
@@ -161,128 +132,536 @@ const STRAIGHT_MOVE_COST := 1.5
 const DIAGONAL_MOVE_COST := 3.0
 ```
 
-Esse sistema permite criar personagens com deslocamentos diferentes, como 6m, 7,5m, 9m, 10,5m ou 12m por turno.
+Esse sistema permite que raças e classes tenham deslocamentos diferentes, como 6m, 9m ou 12m por turno.
 
 ---
 
-### 4. Criação de personagem
+## Criação de personagem
 
-Foi adicionada uma tela antes do início do jogo:
+A tela de criação fica em:
 
 ```text
 Scene/character_creation.tscn
 Scene/character_creation.gd
 ```
 
-A tela permite definir dados iniciais do personagem antes de entrar no combate.
+Ela permite definir:
 
-Funcionalidades atuais:
+- nome do personagem;
+- raça;
+- bônus humano de atributo;
+- classe;
+- modo de vida por nível;
+- rolagem de vida quando aplicável;
+- prévia da ficha antes de iniciar.
 
-- escolha de nome do personagem;
-- escolha de classe inicial;
-- prévia de atributos;
-- botão para confirmar e iniciar o jogo;
-- botão para voltar ao menu inicial.
-
-Ao confirmar, os dados escolhidos são armazenados no `GameState` e aplicados ao herói no início da fase.
-
----
-
-### 5. Herói
-
-O herói foi criado como uma cena própria:
-
-```text
-Scene/units/Hero.tscn
-Scene/units/hero.gd
-```
-
-O herói é representado visualmente por um quadrado azul criado por código.
-
-Dados atuais controlados pelo herói:
-
-```text
-Nome
-Classe
-HP máximo
-HP atual
-Ataque
-Movimento máximo
-Movimento atual
-Nível
-XP total
-XP necessário para o próximo nível
-Nível máximo
-```
-
-Funções principais:
-
-- atualizar posição no mundo;
-- receber dano;
-- morrer;
-- resetar movimento;
-- resetar ataque normal;
-- resetar ataque de oportunidade;
-- aplicar dados do personagem;
-- ganhar XP;
-- calcular nível pelo XP total;
-- subir de nível;
-- calcular progresso de XP no nível atual.
+A tela usa `ScrollContainer`, pois a ficha de personagem cresceu com a adição de raças, classes, atributos, vantagens e habilidades.
 
 ---
 
-### 6. Sistema de níveis
+## Atributos do personagem
 
-Foi implementado um sistema de progressão baseado em **XP total acumulado**.
+Os personagens usam seis atributos principais:
+
+```text
+FOR - Força
+DES - Destreza
+CON - Constituição
+SAB - Sabedoria
+INT - Inteligência
+CAR - Carisma
+```
+
+O modificador é calculado com base no valor do atributo:
+
+```gdscript
+func get_attribute_modifier(attribute_value: int) -> int:
+    return int(floor((attribute_value - 10) / 2.0))
+```
+
+Uso atual dos atributos:
+
+- **Força:** ataque e dano corpo a corpo;
+- **Destreza:** CA, Reflexos e ataques à distância;
+- **Constituição:** HP inicial, vida por nível e Fortitude;
+- **Sabedoria:** Vontade, magias divinas e bônus de CA do Monge;
+- **Inteligência:** magias de Mago;
+- **Carisma:** magias de Bardo/Feiticeiro e habilidades do Paladino.
+
+---
+
+## Raças implementadas
+
+As raças são escolhidas na criação de personagem e alteram atributos, tamanho, deslocamento e vantagens raciais.
+
+### Humano
+
+- **Atributos:** +2 em um atributo à escolha.
+- **Tamanho:** Médio.
+- **Deslocamento:** 9m.
+- **Classe favorecida:** qualquer.
+- **Vantagens:** talento extra no 1º nível e pontos de perícia adicionais.
+
+### Anão
+
+- **Atributos:** +2 Constituição.
+- **Tamanho:** Médio.
+- **Deslocamento:** 6m.
+- **Classe favorecida:** Guerreiro.
+- **Vantagens:** visão no escuro, ligação com pedras, bônus contra venenos e magias, bônus contra orcs/goblinoides e +4 CA contra gigantes.
+- **Observação:** armaduras pesadas não reduzem seu deslocamento.
+
+### Elfo
+
+- **Atributos:** +2 Destreza.
+- **Tamanho:** Médio.
+- **Deslocamento:** 9m.
+- **Classe favorecida:** Mago ou Ranger.
+- **Vantagens:** imunidade a sono, visão no escuro, proficiência com espada longa, rapieira, arco longo e arco curto, +2 em Ouvir, Procurar e Observar.
+
+### Gnomo
+
+- **Atributos:** +2 Constituição.
+- **Tamanho:** Pequeno.
+- **Deslocamento:** 6m.
+- **Classe favorecida:** Bardo.
+- **Vantagens:** visão na penumbra, bônus contra kobolds/goblinoides, +4 CA contra gigantes, +2 em Ouvir e habilidades mágicas inatas se tiver Carisma 10+.
+- **Regra ativa:** tamanho pequeno aplica `size_modifier = +1`, afetando CA e ataque.
+
+### Halfling
+
+- **Atributos:** +2 Destreza.
+- **Tamanho:** Pequeno.
+- **Deslocamento:** 6m.
+- **Classe favorecida:** Ladino.
+- **Vantagens:** +2 em Escalar, Saltar e Mover-se Silenciosamente, +1 em testes de resistência, +2 adicional contra medo e +1 em ataques com armas à distância.
+- **Regra ativa:** tamanho pequeno aplica `size_modifier = +1`, afetando CA e ataque.
+
+### Meio-Elfo
+
+- **Atributos:** +2 Inteligência.
+- **Tamanho:** Médio.
+- **Deslocamento:** 9m.
+- **Classe favorecida:** qualquer.
+- **Vantagens:** imunidade a sono, visão na penumbra, +1 em Ouvir, Procurar e Observar, +2 em Diplomacia e Obter Informação, sangue élfico.
+
+### Meio-Orc
+
+- **Atributos:** +2 Força.
+- **Tamanho:** Médio.
+- **Deslocamento:** 9m.
+- **Classe favorecida:** Bárbaro.
+- **Vantagens:** visão no escuro e sangue orc.
+
+---
+
+## Classes implementadas
+
+As classes definem dado de vida, HP por nível, foco, bônus base de ataque, resistências, atributo mágico e habilidades principais.
+
+O jogador pode escolher entre:
+
+```text
+Bárbaro
+Bardo
+Clérigo
+Druida
+Feiticeiro
+Guerreiro
+Ladino
+Mago
+Monge
+Paladino
+Ranger
+```
+
+---
+
+## Progressão de vida por classe
+
+Na criação do personagem, o jogador escolhe como a vida será tratada por classe:
+
+```text
+Modo padrão: valor fixo da classe + modificador de CON
+Modo rolagem: rola o dado da classe + modificador de CON
+```
+
+Exemplo com Guerreiro:
+
+```text
+Padrão: +6 por nível
+Rolagem: 1d10 por nível
+```
+
+No nível inicial, a vida considera o dado cheio ou a rolagem escolhida, somando o modificador de Constituição.
+
+---
+
+## Classes detalhadas
+
+### Bárbaro
+
+- **Dado de Vida:** d12 ou +8 por nível.
+- **BBA:** alto.
+- **Fortitude:** boa.
+- **Reflexos:** ruim, com +2 extra definido no projeto.
+- **Vontade:** ruim.
+- **Foco:** combate corpo a corpo feroz.
+- **Habilidades:** Fúria, +3m de deslocamento, +2 Reflexos, Redução de Dano 5 no nível 10 e Redução de Dano 10 no nível 15.
+- **Regra ativa:** Fúria com duração e Redução de Dano.
+
+### Bardo
+
+- **Dado de Vida:** d6 ou +4 por nível.
+- **BBA:** médio.
+- **Fortitude:** ruim.
+- **Reflexos:** bons.
+- **Vontade:** boa.
+- **Atributo mágico:** Carisma.
+- **Foco:** suporte, magia arcana e perícias variadas.
+- **Habilidades:** Música Bárdica, Conhecimento Bárdico e conjuração arcana espontânea.
+
+### Clérigo
+
+- **Dado de Vida:** d8 ou +5 por nível.
+- **BBA:** médio.
+- **Fortitude:** boa.
+- **Reflexos:** ruim.
+- **Vontade:** boa.
+- **Atributo mágico:** Sabedoria.
+- **Foco:** cura, suporte divino e combate durável.
+- **Habilidades:** conjuração divina, cura, Expulsar/Fascinar Mortos-Vivos e magias adicionais por divindade.
+
+### Druida
+
+- **Dado de Vida:** d8 ou +5 por nível.
+- **BBA:** médio.
+- **Fortitude:** boa.
+- **Reflexos:** ruim.
+- **Vontade:** boa.
+- **Atributo mágico:** Sabedoria.
+- **Foco:** magia da natureza, controle de terreno e transformação.
+- **Habilidades:** magia divina da natureza, Companheiro Animal e Forma Selvagem.
+
+### Feiticeiro
+
+- **Dado de Vida:** d4 ou +3 por nível.
+- **BBA:** baixo.
+- **Fortitude:** ruim.
+- **Reflexos:** ruim.
+- **Vontade:** boa.
+- **Atributo mágico:** Carisma.
+- **Foco:** poder mágico bruto e instintivo.
+- **Habilidades:** conjuração arcana espontânea, muitas conjurações sem preparo e Familiar.
+
+### Guerreiro
+
+- **Dado de Vida:** d10 ou +6 por nível.
+- **BBA:** alto.
+- **Fortitude:** boa.
+- **Reflexos:** ruim.
+- **Vontade:** ruim.
+- **Foco:** armas e táticas militares.
+- **Habilidades:** talentos adicionais no 1º nível, 2º nível e a cada dois níveis subsequentes.
+
+### Ladino
+
+- **Dado de Vida:** d6 ou +4 por nível.
+- **BBA:** médio.
+- **Fortitude:** ruim.
+- **Reflexos:** bons.
+- **Vontade:** ruim.
+- **Foco:** furtividade, perícias e dano em pontos fracos.
+- **Habilidades:** Ataque Furtivo, Encontrar Armadilhas, Evasão, Esquiva Sobrenatural e grande quantidade de perícias.
+- **Regra ativa:** Ataque Furtivo temporariamente aplicado contra alvo vulnerável.
+
+### Mago
+
+- **Dado de Vida:** d4 ou +3 por nível.
+- **BBA:** baixo.
+- **Fortitude:** ruim.
+- **Reflexos:** ruim.
+- **Vontade:** boa.
+- **Atributo mágico:** Inteligência.
+- **Foco:** utilidade arcana, controle e estudo mágico.
+- **Habilidades:** conjuração arcana preparada, grimório, grande variedade de magias, talento de metamágica inicial e Familiar.
+
+### Monge
+
+- **Dado de Vida:** d8 ou +6 por nível.
+- **BBA:** médio.
+- **Fortitude:** boa.
+- **Reflexos:** bons.
+- **Vontade:** boa.
+- **Foco:** combate desarmado, mobilidade e defesas místicas.
+- **Habilidades:** dano desarmado progressivo, Rajada de Golpes, Sabedoria na CA, Evasão, imunidades progressivas e movimento rápido.
+- **Regras ativas:** bônus de Sabedoria na CA e progressão de dano desarmado.
+
+### Paladino
+
+- **Dado de Vida:** d10 ou +6 por nível.
+- **BBA:** alto.
+- **Fortitude:** boa.
+- **Reflexos:** ruim.
+- **Vontade:** ruim.
+- **Atributo mágico:** Sabedoria.
+- **Restrição:** Leal e Bom.
+- **Foco:** cavaleiro sagrado, liderança e defesa contra o mal.
+- **Habilidades:** Destruir o Mal, Cura pelas Mãos, Graça Divina, Montaria Especial no nível 5 e magias divinas em níveis altos.
+- **Regras ativas:** Graça Divina passiva e Destruir o Mal ativado pelo botão de habilidade.
+
+### Ranger
+
+- **Dado de Vida:** d8 ou +5 por nível.
+- **BBA:** alto.
+- **Fortitude:** boa.
+- **Reflexos:** bons.
+- **Vontade:** ruim.
+- **Atributo mágico:** Sabedoria.
+- **Foco:** sobrevivência, rastreamento e combate especializado.
+- **Habilidades:** Inimigo Predileto, Estilos de Combate nos níveis 2, 6 e 11, Companheiro Animal e magias divinas limitadas.
+
+---
+
+## Classe de Armadura e testes de resistência
+
+O projeto já possui cálculo de:
+
+```text
+CA normal
+CA de toque
+CA desprevenido
+Fortitude
+Reflexos
+Vontade
+```
+
+### CA normal
+
+```text
+10 + bônus de armadura + bônus de escudo + modificador de DES + modificador de tamanho + esquiva + deflexão + armadura natural + outros
+```
+
+### CA de toque
+
+Ignora armadura física, escudo e armadura natural.
+
+### CA desprevenido
+
+Remove bônus de Destreza e bônus de Esquiva.
+
+### Testes de resistência
+
+```text
+1d20 + bônus base da classe + modificador de atributo + bônus mágicos/itens
+```
+
+Usos atuais:
+
+- **Fortitude:** Constituição;
+- **Reflexos:** Destreza;
+- **Vontade:** Sabedoria.
+
+Paladino também soma Carisma nos testes de resistência por causa da Graça Divina.
+
+---
+
+## Sistema de armas
+
+O sistema de armas define:
+
+- tipo de ataque;
+- categoria;
+- dado de dano;
+- quantidade de dados;
+- alcance em metros;
+- margem de crítico;
+- multiplicador crítico;
+- uso de uma ou duas mãos;
+- necessidade de recarga.
+
+### Armas corpo a corpo
+
+| Arma | Dano | Alcance | Crítico | Observação |
+|---|---:|---:|---:|---|
+| Soco | 1d3 | 1,5m | 20/x2 | Monge aumenta o dano |
+| Adaga | 1d4 | 1,5m | 20/x2 | Corpo a corpo leve |
+| Espada Curta | 1d6 | 1,5m | 20/x2 | Espada leve |
+| Espada Longa | 1d8 | 1,5m | 20/x2 | Uma mão |
+| Espada Bastarda | 1d10 | 1,5m | 20/x2 | Duas mãos |
+| Cimitarra | 1d6 | 1,5m | 18-20/x2 | Crítico expandido |
+| Martelo de Combate | 1d6 | 1,5m | 20/x2 | Uma mão |
+| Martelo de Guerra | 1d10 | 1,5m | 20/x2 | Duas mãos |
+| Lança Longa | 1d8 | 3m | 20/x2 | Alcance maior |
+
+### Armas à distância
+
+| Arma | Dano | Alcance | Crítico | Observação |
+|---|---:|---:|---:|---|
+| Arco Curto | 1d6 | 12m | 20/x2 | Arco |
+| Arco Longo | 1d8 | 18m | 20/x2 | Arco |
+| Arco Composto | 1d10 | 24m | 20/x2 | Arco |
+| Besta Pequena | 1d8 | 9m | 20/x2 | Requer recarga |
+| Besta Grande | 1d10 | 12m | 20/x2 | Requer recarga |
+| Funda | 1d6 | 12m | 20/x2 | Arma simples |
 
 Regras atuais:
 
-```text
-Nível máximo: 20
-Nível 1 → 2: 1000 XP total
-A partir daí, cada faixa de nível multiplica a exigência anterior por 1.5
-```
-
-Exemplo:
-
-```text
-Nível 1 → 2: +1000 XP | total 1000
-Nível 2 → 3: +1500 XP | total 2500
-Nível 3 → 4: +2250 XP | total 4750
-Nível 4 → 5: +3375 XP | total 8125
-Nível 5 → 6: +5063 XP | total 13188
-```
-
-O sistema guarda:
-
-```text
-level
-total_xp
-xp_to_next_level
-max_level
-```
-
-A HUD mostra o progresso do nível atual, por exemplo:
-
-```text
-Nv 2 | XP 0/1500
-```
-
-Ao subir de nível, atualmente o herói recebe aumento básico de atributos:
-
-```text
-+10 HP máximo
-+2 ataque
-+1,5m de movimento a cada 3 níveis
-```
-
-Esses valores são provisórios e poderão ser ajustados quando o sistema completo de raças e classes for implementado.
+- ataque corpo a corpo usa BBA + Força + tamanho;
+- ataque à distância usa BBA + Destreza + tamanho;
+- dano corpo a corpo soma Força;
+- armas de duas mãos somam 1,5x o modificador de Força;
+- ataques à distância não somam Força por enquanto;
+- crítico padrão ocorre com 20 natural;
+- Cimitarra ameaça crítico entre 18 e 20;
+- crítico multiplica o dano por 2;
+- bestas exigem recarga e gastam o movimento do turno.
 
 ---
 
-### 7. Inimigo
+## Ataque desarmado e Monge
 
-O inimigo foi criado como uma cena própria:
+Ataque desarmado comum:
+
+```text
+Soco comum = 1d3
+```
+
+Monge usando Soco possui progressão especial:
+
+| Nível | Dano desarmado |
+|---:|---:|
+| 1-3 | 1d6 |
+| 4-7 | 1d8 |
+| 8-11 | 1d10 |
+| 12-15 | 2d6 |
+| 16-19 | 2d8 |
+| 20 | 2d10 |
+
+---
+
+## Sistema de combate
+
+O ataque do herói considera:
+
+```text
+1d20 + bônus de ataque da arma
+```
+
+O ataque acerta se:
+
+```text
+resultado total >= CA do alvo
+```
+
+Regras atuais:
+
+- 1 natural é falha crítica;
+- 20 natural sempre acerta;
+- crítico multiplica dano por 2;
+- cada personagem faz um ataque normal por turno;
+- ataques respeitam o alcance da arma;
+- bestas precisam recarregar;
+- inimigos também usam armas.
+
+---
+
+## Habilidades de classe ativas/passivas
+
+### Bárbaro - Fúria
+
+A Fúria é ativada pelo botão **Habilidade**.
+
+Efeitos atuais:
+
+```text
++4 FOR
++4 CON
++2 Vontade
+-2 CA
+HP temporário baseado no nível
+Duração por turnos
+```
+
+Quando a Fúria acaba:
+
+- os bônus são removidos;
+- a CA é restaurada;
+- o HP máximo temporário é removido;
+- se o HP cair para 0 ou menos, o personagem morre.
+
+### Bárbaro - Redução de Dano
+
+Regra atual:
+
+```text
+Nível 1-9: RD 0
+Nível 10-14: RD 5
+Nível 15-20: RD 10
+```
+
+A RD reduz o dano recebido no `take_damage()`.
+
+### Paladino - Destruir o Mal
+
+O botão **Habilidade** prepara o próximo ataque com Destruir o Mal.
+
+Efeitos:
+
+```text
++ modificador de Carisma no ataque
++ nível do Paladino no dano
+```
+
+Após o próximo ataque, acertando ou errando, o uso é consumido.
+
+### Paladino - Graça Divina
+
+Passiva já aplicada:
+
+```text
+Fortitude + CAR
+Reflexos + CAR
+Vontade + CAR
+```
+
+Apenas modificadores positivos são considerados.
+
+### Monge - Sabedoria na CA
+
+Passiva já aplicada:
+
+```text
+CA += modificador de Sabedoria
+CA de toque += modificador de Sabedoria
+```
+
+### Ladino - Ataque Furtivo
+
+O Ladino possui ataque furtivo implementado de forma provisória.
+
+Regra atual temporária:
+
+```text
+Se o inimigo estiver vulnerável, o Ladino soma dano extra de Ataque Furtivo.
+```
+
+Progressão atual:
+
+```text
+Nível 1: 1d6
+Nível 3: 2d6
+Nível 5: 3d6
+Nível 7: 4d6
+```
+
+A regra definitiva ainda será substituída por flanqueamento, invisibilidade, desprevenido, imobilizado ou perda de DES na CA.
+
+---
+
+## Inimigos
+
+O inimigo atual fica em:
 
 ```text
 Scene/units/Enemy.tscn
@@ -293,90 +672,84 @@ Características atuais:
 
 ```text
 HP máximo: 50
-Dano: 10
 Movimento máximo: 6m
 Posição inicial: 10,7
+Arma inicial: Adaga
 ```
 
-O inimigo é representado visualmente por um quadrado vermelho criado por código.
+O inimigo possui:
 
-Funções principais:
-
-- atualizar posição no mundo;
-- receber dano;
-- morrer;
-- resetar movimento;
-- controlar ataque de oportunidade.
+- atributos;
+- CA;
+- ataque corpo a corpo;
+- ataque à distância;
+- sistema de armas;
+- dano por dado de arma;
+- crítico;
+- recarga;
+- ataque de oportunidade.
 
 ---
 
-### 8. Movimento do herói
+## IA inimiga
 
-O jogador pode mover o herói clicando nas casas do tabuleiro.
+A IA inimiga escolhe posições usando pontuação.
 
-O sistema calcula:
+Critérios atuais:
 
-- casa clicada;
-- distância entre posição atual e destino;
-- custo em metros;
-- se o movimento está dentro do deslocamento restante;
-- se a casa está ocupada pelo inimigo.
+- prioriza ficar dentro do alcance da arma equipada;
+- aproxima-se do herói;
+- evita ocupar a mesma casa;
+- reduz gasto de movimento desnecessário;
+- já possui estrutura para pontuação de terreno no futuro.
 
-O movimento consome deslocamento restante.
+A IA agora considera o alcance da arma. Um inimigo arqueiro, por exemplo, não precisa colar no herói para atacar.
 
-Exemplo:
+---
+
+## Ataque de oportunidade
+
+Regra implementada:
 
 ```text
-Movimento inicial: 9m
-Andou 1 casa reta: -1,5m
-Restante: 7,5m
-
-Andou 1 casa diagonal: -3m
-Restante: 4,5m
+Se uma unidade estava dentro da área de ameaça de outra
+e se move para fora dessa área,
+ela sofre ataque de oportunidade.
 ```
 
-O jogador pode continuar andando enquanto ainda tiver deslocamento disponível.
+Cada unidade pode realizar apenas um ataque de oportunidade por turno.
 
 ---
 
-### 9. Área de movimentação visível
+## HUD de batalha
 
-Foi criada uma camada visual para mostrar as casas alcançáveis pelo personagem.
+A HUD de batalha é horizontal, compacta e semitransparente.
 
-As casas possíveis aparecem destacadas em azul claro.
+Informações exibidas:
 
-A área muda automaticamente conforme o personagem gasta movimento.
-
-Exemplo:
-
-```text
-Herói com 9m disponíveis → área maior.
-Herói com 3m restantes → área menor.
-Herói com 0m → nenhuma casa de movimento disponível.
-```
-
----
-
-### 10. HUD de batalha
-
-A interface de combate foi reformulada para uma HUD retangular horizontal, compacta e semi-transparente, posicionada próxima ao rodapé da tela.
-
-A HUD mostra:
-
-- nome do personagem;
-- classe atual;
+- nome;
+- raça;
+- classe;
 - nível;
-- XP do nível atual;
-- vida atual e máxima;
-- movimento atual e máximo;
+- XP;
+- vida;
+- movimento;
+- arma equipada;
+- redução de dano;
+- Fúria restante;
+- status de Destruir o Mal;
+- CA;
+- Fortitude;
+- Reflexos;
+- Vontade;
 - turno atual;
-- HP do inimigo;
-- botões de ação.
+- vida do inimigo.
 
 Botões atuais:
 
 ```text
 Ataque
+Habilidade
 Magia
 Itens
 Terminar Turno
@@ -384,191 +757,102 @@ Salvar
 Sair
 ```
 
-Estado atual dos botões:
+Estado atual:
 
-```text
-Ataque: funcional
-Magia: placeholder/desativado
-Itens: placeholder/desativado
-Terminar Turno: funcional
-Salvar: funcional
-Sair: funcional, com confirmação
-```
-
-A HUD substituiu a interface vertical anterior e ocupa menos espaço visual no mapa.
+- **Ataque:** funcional;
+- **Habilidade:** funcional para Bárbaro e Paladino, informativa para outras classes;
+- **Magia:** placeholder;
+- **Itens:** placeholder;
+- **Terminar Turno:** funcional;
+- **Salvar:** cria save manual;
+- **Sair:** confirma, salva autosave e volta ao menu.
 
 ---
 
-### 11. Sistema de turnos
+## Sistema de XP e níveis
 
-O jogo usa um `enum` para controlar o turno atual.
+O sistema usa XP total acumulado.
 
-```gdscript
-enum TurnState {
-  HERO_TURN,
-  ENEMY_TURN
-}
-```
-
-Fluxo atual:
+Regras atuais:
 
 ```text
-Turno do Herói
-  jogador move
-  jogador ataca
-  jogador encerra turno
-
-Turno do Inimigo
-  inimigo avalia posição
-  inimigo move
-  inimigo ataca se possível
-
-Volta para o Herói
+Nível máximo: 20
+Nível 1 → 2: 1000 XP total
+Cada nova faixa aumenta 1.5x em relação à anterior
 ```
 
-Ao iniciar um novo turno do herói:
+Exemplo:
 
-- movimento é restaurado;
-- ataque normal é restaurado;
-- ataque de oportunidade é restaurado;
-- área de movimento é recalculada.
+```text
+Nível 1 → 2: +1000 XP | total 1000
+Nível 2 → 3: +1500 XP | total 2500
+Nível 3 → 4: +2250 XP | total 4750
+Nível 4 → 5: +3375 XP | total 8125
+```
+
+A HUD mostra o progresso do nível atual:
+
+```text
+Nv 2 | XP 0/1500
+```
+
+Ao derrotar o inimigo atual, o herói recebe 1000 XP para teste.
 
 ---
 
-### 12. Combate básico
+## Save e carregamento
 
-O herói pode atacar o inimigo se estiver adjacente.
-
-O ataque considera distância por grade:
+O projeto possui dois tipos de save:
 
 ```text
-Alcance corpo a corpo = 1 casa
+Autosave
+Save manual
 ```
 
-O ataque pode atingir:
+### Autosave
 
-- horizontal;
-- vertical;
-- diagonal.
+Usado quando o jogador abandona a partida pela HUD.
 
-Cada personagem só pode fazer um ataque normal por turno.
-
-Quando o inimigo é derrotado, o herói recebe XP. Atualmente, para teste do sistema de nível, o inimigo concede:
+Arquivo:
 
 ```text
-1000 XP
+user://autosave.json
 ```
 
-Esse valor será balanceado futuramente por tipo de inimigo, desafio ou stage.
+### Saves manuais
+
+Criados pelo botão **Salvar**.
+
+Diretório:
+
+```text
+user://manual_saves/
+```
+
+Modelo atual de save:
+
+- salva o stage atual;
+- salva nome, raça e classe;
+- salva atributos;
+- salva HP máximo, ataque e movimento;
+- salva nível e XP;
+- salva dados de classe;
+- salva dados raciais;
+- não salva o estado exato do meio da batalha.
+
+Modelo escolhido:
+
+```text
+Se o jogador sair no meio da fase,
+ao continuar ele volta para o início da fase atual,
+com os presets salvos do personagem.
+```
 
 ---
 
-### 13. Ataque de oportunidade
+## GameState
 
-Foi implementada a regra de ataque de oportunidade.
-
-Regra atual:
-
-```text
-Se um personagem estava dentro da área de ataque de outro personagem
-e se move para fora dessa área,
-ele recebe automaticamente um ataque de oportunidade.
-```
-
-Funciona nos dois sentidos:
-
-```text
-Herói sai da zona de ameaça do inimigo → inimigo ataca automaticamente.
-Inimigo sai da zona de ameaça do herói → herói ataca automaticamente.
-```
-
-Cada personagem só pode realizar um ataque de oportunidade por turno.
-
----
-
-### 14. IA inimiga
-
-Foi criada uma IA inimiga baseada em pontuação.
-
-A IA avalia todas as casas possíveis e escolhe a melhor posição.
-
-Critérios atuais:
-
-- priorizar ficar em alcance de ataque;
-- aproximar-se do herói;
-- gastar menos movimento quando possível;
-- evitar ficar na mesma casa do herói;
-- preparar espaço para pontuação futura de terreno.
-
-A função de terreno ainda está preparada para expansão:
-
-```text
-terreno alto: +80
-cobertura: +60
-terreno difícil: -40
-lava/veneno: -200
-posição exposta: -30
-```
-
-Esses valores ainda são planejamento, mas a estrutura já existe para evoluir a IA.
-
----
-
-### 15. Menu inicial
-
-Foi criada uma tela inicial em:
-
-```text
-Scene/main_menu.tscn
-Scene/main_menu.gd
-```
-
-Opções atuais:
-
-```text
-Iniciar
-Continuar
-Configurações
-Sair
-```
-
-Funções atuais:
-
-- **Iniciar:** abre a criação de personagem;
-- **Continuar:** abre a tela/lista de saves;
-- **Configurações:** abre tela de configurações;
-- **Sair:** fecha o jogo.
-
----
-
-### 16. Configurações
-
-O botão **Configurações** abre uma tela própria dentro do menu inicial.
-
-Opções implementadas:
-
-- volume geral do jogo;
-- volume dos efeitos;
-- idioma;
-- créditos;
-- salvar configurações;
-- voltar.
-
-As configurações são salvas em:
-
-```text
-user://settings.json
-```
-
-O volume geral usa o bus `Master`.
-
-O volume dos efeitos usa o bus `SFX`. Caso o bus `SFX` não exista, o jogo cria esse bus em tempo de execução.
-
----
-
-### 17. Sistema global GameState
-
-Foi criado um Autoload chamado:
+O projeto usa o Autoload:
 
 ```text
 GameState
@@ -580,319 +864,163 @@ Arquivo:
 Scene/game_state.gd
 ```
 
-Função atual:
+Responsabilidades:
 
-- guardar se o jogo deve carregar save;
-- guardar qual arquivo de save foi escolhido;
-- guardar o stage selecionado;
-- guardar dados do personagem criado;
+- guardar se deve carregar save;
+- guardar caminho do save selecionado;
+- guardar stage atual;
+- guardar nome do personagem;
+- guardar raça;
+- guardar classe;
+- guardar atributos;
+- guardar HP, ataque e movimento;
 - guardar nível e XP;
-- guardar presets atuais do herói.
+- guardar dados de raça;
+- guardar dados de classe;
+- guardar modo de progressão de vida.
 
-Dados atuais esperados:
+Dados principais:
 
 ```gdscript
-extends Node
-
 var should_load_save: bool = false
 var selected_save_path: String = ""
 var selected_stage: int = 1
 
 var player_name: String = "Herói"
-var player_class: String = "Guerreiro"
+var player_class: String = "Sem Classe"
+var player_race: String = "Humano"
+
+var hero_max_hp: int = 100
+var hero_attack_power: int = 20
+var hero_max_movement_meters: float = 9.0
 
 var hero_level: int = 1
 var hero_total_xp: int = 0
 var hero_xp_to_next_level: int = 1000
 var hero_max_level: int = 20
 
-var hero_max_hp: int = 100
-var hero_attack_power: int = 20
-var hero_max_movement_meters: float = 9.0
+var hero_strength: int = 10
+var hero_dexterity: int = 10
+var hero_constitution: int = 10
+var hero_wisdom: int = 10
+var hero_intelligence: int = 10
+var hero_charisma: int = 10
+
+var hero_size: String = "Médio"
+var hero_size_modifier: int = 0
+var hero_favored_class: String = "Qualquer"
+var hero_race_traits: Array = []
+
+var hero_class_hit_die: int = 12
+var hero_hp_fixed_per_level: int = 8
+var hero_hp_progression_mode: String = "fixed"
+
+var hero_base_attack_bonus_type: String = "alto"
+var hero_fortitude_type: String = "bom"
+var hero_reflex_type: String = "ruim"
+var hero_will_type: String = "ruim"
+
+var hero_fortitude_base_bonus: int = 2
+var hero_reflex_base_bonus: int = 2
+var hero_will_base_bonus: int = 0
+
+var hero_class_movement_bonus: float = 0.0
+var hero_damage_reduction: int = 0
+var hero_class_features: Array = []
 ```
 
 ---
 
-### 18. Sistema de stages
+## Menu inicial
 
-O jogo já possui estrutura para iniciar fases.
-
-Função central:
-
-```gdscript
-start_stage(stage_number)
-```
-
-A lógica atual reinicia a fase com presets salvos, em vez de carregar o combate exatamente do ponto onde parou.
-
-Modelo escolhido:
+Arquivos:
 
 ```text
-Se o jogador sair no meio da fase 5,
-ao continuar ele volta para o início da fase 5,
-com os presets que tinha salvo.
+Scene/main_menu.tscn
+Scene/main_menu.gd
 ```
 
-Atualmente existem presets para:
+Opções:
 
 ```text
-Stage 1
-Stage 2 - estrutura inicial de exemplo
+Iniciar
+Continuar
+Configurações
+Sair
 ```
+
+Funções:
+
+- **Iniciar:** abre criação de personagem;
+- **Continuar:** abre lista de saves;
+- **Configurações:** abre popup de configurações;
+- **Sair:** fecha o jogo.
 
 ---
 
-### 19. Sistema de save
+## Configurações
 
-O sistema de save foi dividido em dois tipos:
+O menu de configurações permite ajustar:
 
-```text
-AutoSave
-Save Manual
-```
+- volume geral;
+- volume dos efeitos;
+- idioma;
+- créditos.
 
-#### AutoSave
-
-Criado ao abandonar a partida.
-
-Caminho:
+Arquivo de configurações:
 
 ```text
-user://autosave.json
+user://settings.json
 ```
 
-Uso:
-
-```text
-Continuar rapidamente a partir do último progresso salvo automaticamente.
-```
-
-#### Save Manual
-
-Criado pelo botão **Salvar**.
-
-Caminho:
-
-```text
-user://manual_saves/
-```
-
-Formato dos arquivos:
-
-```text
-save_stage_1_YYYY-MM-DD_HH-MM-SS.json
-```
-
-Uso:
-
-```text
-Permitir que o jogador tenha saves antigos separados.
-```
+O sistema usa o bus `Master` e cria/usa o bus `SFX` para efeitos.
 
 ---
 
-### 20. Tela de seleção de saves
+## Sistemas ainda planejados
 
-O botão **Continuar** abre uma tela com a lista de saves disponíveis.
+Próximas melhorias previstas:
 
-A lista pode mostrar:
-
-```text
-AutoSave - Stage X
-Manual - Stage X - nome_do_arquivo.json
-```
-
-Ao escolher um save:
-
-- o caminho do arquivo é salvo em `GameState.selected_save_path`;
-- o jogo abre `main.tscn`;
-- o stage salvo é carregado;
-- a fase inicia do começo com os presets salvos.
-
----
-
-### 21. Botão Sair/Abandonar com confirmação
-
-O botão de saída da batalha abre um popup de confirmação.
-
-Fluxo:
-
-```text
-Jogador clica em Sair/Abandonar
-  aparece popup: deseja salvar e voltar ao menu?
-
-Não
-  fecha popup e permanece no jogo
-
-Sim
-  cria/atualiza autosave
-  volta para o menu inicial
-```
-
----
-
-## Modelo de save atual
-
-O save não grava o estado exato do combate.
-
-Ele grava o progresso principal do personagem e da fase:
-
-```json
-{
-  "current_stage": 1,
-  "player_presets": {
-    "player_name": "Herói",
-    "player_class": "Guerreiro",
-    "hero_level": 1,
-    "hero_total_xp": 0,
-    "hero_xp_to_next_level": 1000,
-    "hero_max_hp": 100,
-    "hero_attack_power": 20,
-    "hero_max_movement_meters": 9.0
-  }
-}
-```
-
-Esse modelo foi escolhido para evitar abuso de save no meio da luta e manter o design mais próximo de fases táticas.
-
----
-
-## Como jogar o protótipo atual
-
-1. Abra o projeto no Godot.
-2. Execute a cena principal pelo botão Play.
-3. No menu, clique em **Iniciar**.
-4. Crie o personagem.
-5. Confirme para começar o jogo.
-6. Clique nas casas azuis para mover o herói.
-7. Aproxime-se do inimigo.
-8. Clique em **Ataque** quando estiver adjacente.
-9. Clique em **Terminar Turno** para passar a vez.
-10. O inimigo executará sua IA.
-11. Use **Salvar** para criar um save manual.
-12. Use **Sair/Abandonar** para gerar autosave e voltar ao menu.
-13. Use **Continuar** para escolher AutoSave ou saves manuais.
-
----
-
-## Regras atuais de movimentação
-
-```text
-Casa reta: 1,5m
-Casa diagonal: 3,0m
-Herói: conforme personagem criado/preset atual
-Inimigo: 6m por turno
-```
-
-A movimentação é consumida a cada clique.
-
----
-
-## Regras atuais de combate
-
-```text
-Ataque corpo a corpo: alcance 1 casa
-Ataque normal: 1 vez por turno
-Ataque de oportunidade: 1 vez por turno
-XP por inimigo derrotado: 1000 XP temporário para teste
-```
-
----
-
-## Regras atuais de nível
-
-```text
-Nível inicial: 1
-Nível máximo: 20
-XP total para nível 2: 1000
-Multiplicador de exigência por nível: 1.5
-```
-
-Progressão inicial:
-
-```text
-Nível 1 → 2: +1000 XP | total 1000
-Nível 2 → 3: +1500 XP | total 2500
-Nível 3 → 4: +2250 XP | total 4750
-Nível 4 → 5: +3375 XP | total 8125
-```
-
----
-
-## Próximos passos planejados
-
-### Raças e classes
-
-- implementar raças básicas;
-- aplicar bônus raciais;
-- criar classes básicas completas;
-- definir dado de vida por classe;
-- definir deslocamento por raça;
-- definir vantagens raciais;
-- criar atributos principais: Força, Destreza, Constituição, Inteligência, Sabedoria e Carisma.
-
-### Sistemas de gameplay
-
-- criar múltiplos inimigos;
-- implementar alcance diferente por arma;
-- implementar magias;
-- implementar itens;
-- implementar CA real;
-- criar tela de vitória e derrota;
-- criar mudança real de stages.
-
-### Terreno e estratégia
-
-- terreno alto com vantagem de ataque;
-- cobertura parcial e total;
+- sistema completo de magias;
+- botão e lógica de cura do Clérigo;
+- Música Bárdica do Bardo;
+- Forma Selvagem do Druida;
+- Familiar do Mago/Feiticeiro;
+- Companheiro Animal do Druida/Ranger;
+- flanqueamento real para o Ladino;
+- Evasão;
+- Rajada de Golpes do Monge;
+- talentos do Guerreiro;
+- Inimigo Predileto do Ranger;
+- Montaria Especial do Paladino;
+- armaduras e escudos;
+- inventário;
+- itens consumíveis;
+- magias de toque e magias à distância;
+- efeitos de status;
+- tipos de criatura;
 - terreno difícil;
-- obstáculos;
-- linha de visão;
-- áreas perigosas, como fogo, veneno ou armadilhas.
-
-### IA
-
-- IA agressiva;
-- IA defensiva;
-- IA que busca cobertura;
-- IA que busca terreno alto;
-- IA que foge com pouca vida;
-- IA de chefe;
-- IA que trabalha em grupo.
-
-### Interface
-
-- melhorar visual da HUD;
-- adicionar retrato do personagem;
-- criar tooltip de habilidades;
-- criar menu de magia;
-- criar menu de itens;
-- criar tela de ficha do personagem;
-- melhorar tela de criação de personagem.
-
-### Progressão
-
-- balancear XP por inimigo;
-- criar recompensas por stage;
-- implementar evolução por classe;
-- criar talentos;
-- criar perícias;
-- salvar raça, classe, atributos e habilidades.
+- cobertura;
+- terreno alto;
+- múltiplos inimigos;
+- múltiplas fases;
+- balanceamento de XP;
+- interface visual para escolher arma;
+- sprites e animações definitivas.
 
 ---
 
-## Créditos
+## Objetivo do projeto
 
-Desenvolvimento:
+O objetivo de **Táticas do Destino** é construir, passo a passo, um RPG tático funcional com profundidade de RPG de mesa, onde raça, classe, arma, atributo, posicionamento, alcance, defesa e habilidades tenham impacto real no combate.
 
-```text
-Luiggy Alberto
-```
+O projeto também serve como estudo prático de:
 
-Engine:
-
-```text
-Godot 4.6
-```
-
-Projeto criado como estudo prático de desenvolvimento de jogos táticos, GDScript, sistemas de RPG e organização de projeto em GitHub.
+- Godot;
+- GDScript;
+- lógica de jogos táticos;
+- organização de código;
+- sistemas de RPG;
+- IA simples;
+- save/load;
+- balanceamento de combate.
