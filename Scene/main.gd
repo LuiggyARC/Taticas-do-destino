@@ -25,6 +25,7 @@ var ui_layer: CanvasLayer
 var movement_label: Label
 var end_turn_button: Button
 var attack_button: Button
+var class_skill_button: Button
 var enemy_label: Label
 var hero: Node2D
 var enemy: Node2D
@@ -78,7 +79,13 @@ func save_manual_game():
 		"hero_xp_to_next_level": hero.xp_to_next_level if is_instance_valid(hero) else GameState.hero_xp_to_next_level,
 		"hero_max_hp": hero.max_hp if is_instance_valid(hero) else GameState.hero_max_hp,
 		"hero_attack_power": hero.attack_power if is_instance_valid(hero) else GameState.hero_attack_power,
-		"hero_max_movement_meters": hero.max_movement_meters if is_instance_valid(hero) else GameState.hero_max_movement_meters
+		"hero_max_movement_meters": hero.max_movement_meters if is_instance_valid(hero) else GameState.hero_max_movement_meters,
+		"hero_strength": hero.strength if is_instance_valid(hero) else GameState.hero_strength,
+		"hero_dexterity": hero.dexterity if is_instance_valid(hero) else GameState.hero_dexterity,
+		"hero_constitution": hero.constitution if is_instance_valid(hero) else GameState.hero_constitution,
+		"hero_wisdom": hero.wisdom if is_instance_valid(hero) else GameState.hero_wisdom,
+		"hero_intelligence": hero.intelligence if is_instance_valid(hero) else GameState.hero_intelligence,
+		"hero_charisma": hero.charisma if is_instance_valid(hero) else GameState.hero_charisma,
 	}
 }
 	var file := FileAccess.open(save_path, FileAccess.WRITE)
@@ -91,7 +98,7 @@ func save_manual_game():
 	file.close()
 	
 	print("Save manual criado em: ", save_path)
-	
+
 func save_auto_game():
 	var save_data := {
 		"current_stage": current_stage,
@@ -100,7 +107,13 @@ func save_auto_game():
 	"player_class": GameState.player_class,
 	"hero_max_hp": hero.max_hp if is_instance_valid(hero) else 100,
 	"hero_attack_power": hero.attack_power if is_instance_valid(hero) else 20,
-	"hero_max_movement_meters": hero.max_movement_meters if is_instance_valid(hero) else 9.0
+	"hero_max_movement_meters": hero.max_movement_meters if is_instance_valid(hero) else 9.0,
+	"hero_strength": hero.strength if is_instance_valid(hero) else GameState.hero_strength,
+	"hero_dexterity": hero.dexterity if is_instance_valid(hero) else GameState.hero_dexterity,
+	"hero_constitution": hero.constitution if is_instance_valid(hero) else GameState.hero_constitution,
+	"hero_wisdom": hero.wisdom if is_instance_valid(hero) else GameState.hero_wisdom,
+	"hero_intelligence": hero.intelligence if is_instance_valid(hero) else GameState.hero_intelligence,
+	"hero_charisma": hero.charisma if is_instance_valid(hero) else GameState.hero_charisma,
 }
 	}
 	
@@ -114,7 +127,12 @@ func save_auto_game():
 	file.close()
 	
 	print("Autosave criado. Stage atual: ", current_stage)
-	
+	GameState.hero_strength = int(loaded_player_presets.get("hero_strength", 10))
+	GameState.hero_dexterity = int(loaded_player_presets.get("hero_dexterity", 10))
+	GameState.hero_constitution = int(loaded_player_presets.get("hero_constitution", 10))
+	GameState.hero_wisdom = int(loaded_player_presets.get("hero_wisdom", 10))
+	GameState.hero_intelligence = int(loaded_player_presets.get("hero_intelligence", 10))
+	GameState.hero_charisma = int(loaded_player_presets.get("hero_charisma", 10))
 func load_progress():
 	var save_path: String = GameState.selected_save_path
 	
@@ -258,6 +276,13 @@ func create_ui():
 	attack_button.pressed.connect(hero_attack)
 	button_row.add_child(attack_button)
 	
+	class_skill_button = Button.new()
+	class_skill_button.name = "ClassSkillButton"
+	class_skill_button.text = "Habilidade"
+	class_skill_button.custom_minimum_size = Vector2(120, 38)
+	class_skill_button.pressed.connect(use_class_skill)
+	button_row.add_child(class_skill_button)
+
 	var magic_button := Button.new()
 	magic_button.name = "MagicButton"
 	magic_button.text = "Magia"
@@ -394,16 +419,13 @@ func end_hero_turn():
 	if current_turn != TurnState.HERO_TURN:
 		return
 	
-	print("Turno do herói encerrado.")
+	if is_instance_valid(hero):
+		hero.update_rage_turn()
+	
 	current_turn = TurnState.ENEMY_TURN
-	
-	clear_movement_area()
+	print("Turno do herói encerrado.")
 	update_movement_label()
-	
-	await get_tree().create_timer(0.5).timeout
-	
-	await enemy_turn()
-
+	enemy_turn()
 func hero_attack():
 	if current_turn != TurnState.HERO_TURN:
 		return
@@ -416,19 +438,83 @@ func hero_attack():
 		print("O herói já atacou neste turno.")
 		return
 	
-	var distance = get_attack_distance(hero.grid_position, enemy.grid_position)
-	
-	if distance <= 1:
-		enemy.take_damage(hero.attack_power)
+	if hero.weapon_requires_reload() and hero.weapon_needs_reload:
+		print(hero.equipped_weapon, " precisa recarregar.")
+		print("Recarregando. O personagem perde o movimento neste turno.")
+		hero.weapon_needs_reload = false
+		hero.current_movement_meters = 0
 		hero.has_attacked = true
-		
-		if not is_instance_valid(enemy) or enemy.hp <= 0:
-			grant_hero_xp(1000)
-		
+		show_movement_area()
 		update_movement_label()
-	else:
+		return
+	
+	var distance_in_tiles = get_attack_distance(hero.grid_position, enemy.grid_position)
+	var distance_in_meters = distance_in_tiles * STRAIGHT_MOVE_COST
+	var weapon_range = hero.get_weapon_range_meters()
+	
+	if distance_in_meters > weapon_range:
 		print("Inimigo fora de alcance.")
-		print("Aproxime-se para atacar.")
+		print("Distância: ", distance_in_meters, "m")
+		print("Alcance da arma: ", weapon_range, "m")
+		return
+	
+	var dice_roll: int = randi_range(1, 20)
+	var attack_bonus: int = int(hero.get_weapon_attack_bonus())
+	var damage_bonus: int = 0
+	
+	var using_smite_evil := false
+	
+	if hero.can_use_smite_evil():
+		using_smite_evil = true
+		attack_bonus += hero.get_smite_evil_attack_bonus()
+		damage_bonus += hero.get_smite_evil_damage_bonus()
+		hero.use_smite_evil()
+	
+	var attack_total: int = dice_roll + attack_bonus
+	var target_ac: int = int(enemy.get_armor_class())
+	var critical_min: int = int(hero.get_weapon_critical_min())
+	var critical_multiplier: int = int(hero.get_weapon_critical_multiplier())
+	
+	print("Arma usada: ", hero.get_weapon_description())
+	print("Ataque do herói: d20=", dice_roll, " + bônus=", attack_bonus, " total=", attack_total, " contra CA ", target_ac)
+	
+	if dice_roll == 1:
+		print("Falha crítica. O herói errou.")
+	elif dice_roll == 20 or attack_total >= target_ac:
+		var final_damage: int = int(hero.roll_total_weapon_damage()) + damage_bonus
+		
+		var target_is_vulnerable := false
+		
+		if can_hero_sneak_attack_enemy():
+			target_is_vulnerable = true
+		
+		if hero.can_sneak_attack(target_is_vulnerable):
+			var sneak_damage: int = int(hero.get_sneak_attack_damage())
+			final_damage += sneak_damage
+			print("Ataque Furtivo! Dano extra: ", sneak_damage)
+		
+		if dice_roll >= critical_min:
+			final_damage *= critical_multiplier
+			hero.damage = final_damage
+			print("Acerto crítico! Dano multiplicado x", critical_multiplier)
+		
+		if using_smite_evil:
+			print("Destruir o Mal aplicado! Bônus de dano: ", damage_bonus)
+		
+		print("O herói acertou e causou ", final_damage, " de dano.")
+		enemy.take_damage(final_damage)
+		
+		if hero.weapon_requires_reload():
+			hero.weapon_needs_reload = true
+	else:
+		print("O herói errou o ataque.")
+	
+	hero.has_attacked = true
+	
+	if not is_instance_valid(enemy) or enemy.hp <= 0:
+		grant_hero_xp(1000)
+	
+	update_movement_label()
 func get_attack_distance(from_position: Vector2i, to_position: Vector2i) -> int:
 	var dx = abs(to_position.x - from_position.x)
 	var dy = abs(to_position.y - from_position.y)
@@ -472,17 +558,65 @@ func can_enemy_attack_hero() -> bool:
 	if not is_instance_valid(hero):
 		return false
 	
-	var distance = get_attack_distance(enemy.grid_position, hero.grid_position)
-	return distance <= 1
+	var distance_in_tiles = get_attack_distance(enemy.grid_position, hero.grid_position)
+	var distance_in_meters = distance_in_tiles * STRAIGHT_MOVE_COST
+	var weapon_range = enemy.get_weapon_range_meters()
+	
+	return distance_in_meters <= weapon_range
 
 func enemy_attack_hero():
 	if not is_instance_valid(hero):
 		return
 	
-	print("Inimigo atacou o herói.")
-	hero.take_damage(enemy.attack_power)
+	if not is_instance_valid(enemy):
+		return
+	
+	if enemy.weapon_requires_reload() and enemy.weapon_needs_reload:
+		print(enemy.equipped_weapon, " do inimigo precisa recarregar.")
+		print("Inimigo recarregou e perdeu o movimento.")
+		enemy.weapon_needs_reload = false
+		enemy.current_movement_meters = 0
+		update_movement_label()
+		return
+	
+	var distance_in_tiles = get_attack_distance(enemy.grid_position, hero.grid_position)
+	var distance_in_meters = distance_in_tiles * STRAIGHT_MOVE_COST
+	var weapon_range = enemy.get_weapon_range_meters()
+	
+	if distance_in_meters > weapon_range:
+		print("Herói fora do alcance da arma do inimigo.")
+		print("Distância: ", distance_in_meters, "m")
+		print("Alcance inimigo: ", weapon_range, "m")
+		return
+	
+	var dice_roll: int = randi_range(1, 20)
+	var attack_total: int = dice_roll + int(enemy.get_weapon_attack_bonus())
+	var target_ac: int = int(hero.get_armor_class())
+	var critical_min: int = int(enemy.get_weapon_critical_min())
+	var critical_multiplier: int = int(enemy.get_weapon_critical_multiplier())
+	print("Arma do inimigo: ", enemy.get_weapon_description())
+	print("Ataque do inimigo: d20=", dice_roll, " + bônus=", enemy.get_weapon_attack_bonus(), " total=", attack_total, " contra CA ", target_ac)
+	
+	if dice_roll == 1:
+		print("Falha crítica. O inimigo errou.")
+	elif dice_roll == 20 or attack_total >= target_ac:
+		var final_damage: int = int(enemy.roll_total_weapon_damage())
+		
+		if dice_roll >= critical_min:
+			final_damage *= critical_multiplier
+			enemy.damage = final_damage
+			print("Crítico do inimigo! Dano x", critical_multiplier)
+		
+		print("Inimigo acertou e causou ", final_damage, " de dano.")
+		hero.take_damage(final_damage)
+		
+		if enemy.weapon_requires_reload():
+			enemy.weapon_needs_reload = true
+	else:
+		print("Inimigo errou o ataque.")
+	
 	update_movement_label()
-
+	
 func move_enemy_to(new_grid_position: Vector2i):
 	var cost = get_movement_cost(enemy.grid_position, new_grid_position)
 	
@@ -519,6 +653,7 @@ func is_valid_enemy_move_position(test_position: Vector2i) -> bool:
 		return false
 	
 	if test_position == hero.grid_position:
+		
 		return false
 	
 	var cost = get_movement_cost(enemy.grid_position, test_position)
@@ -533,9 +668,10 @@ func evaluate_enemy_position(test_position: Vector2i) -> float:
 	
 	var distance_to_hero = get_attack_distance(test_position, hero.grid_position)
 	var movement_cost = get_movement_cost(enemy.grid_position, test_position)
-	
+	var distance_in_meters = distance_to_hero * STRAIGHT_MOVE_COST
+	var weapon_range = enemy.get_weapon_range_meters()
 	# 1. Prioridade máxima: ficar em alcance de ataque
-	if distance_to_hero <= 1:
+	if distance_in_meters <= weapon_range:
 		score += 1000.0
 	
 	# 2. Aproximar do herói
@@ -665,6 +801,13 @@ func apply_player_presets():
 	var loaded_attack_power := GameState.hero_attack_power
 	var loaded_max_movement := GameState.hero_max_movement_meters
 	
+	var loaded_strength := GameState.hero_strength
+	var loaded_dexterity := GameState.hero_dexterity
+	var loaded_constitution := GameState.hero_constitution
+	var loaded_wisdom := GameState.hero_wisdom
+	var loaded_intelligence := GameState.hero_intelligence
+	var loaded_charisma := GameState.hero_charisma
+	
 	if GameState.should_load_save and not loaded_player_presets.is_empty():
 		player_name = str(loaded_player_presets.get("player_name", "Herói"))
 		player_class = str(loaded_player_presets.get("player_class", "Guerreiro"))
@@ -676,6 +819,13 @@ func apply_player_presets():
 		loaded_max_hp = int(loaded_player_presets.get("hero_max_hp", 100))
 		loaded_attack_power = int(loaded_player_presets.get("hero_attack_power", 20))
 		loaded_max_movement = float(loaded_player_presets.get("hero_max_movement_meters", 9.0))
+		
+		loaded_strength = int(loaded_player_presets.get("hero_strength", 10))
+		loaded_dexterity = int(loaded_player_presets.get("hero_dexterity", 10))
+		loaded_constitution = int(loaded_player_presets.get("hero_constitution", 10))
+		loaded_wisdom = int(loaded_player_presets.get("hero_wisdom", 10))
+		loaded_intelligence = int(loaded_player_presets.get("hero_intelligence", 10))
+		loaded_charisma = int(loaded_player_presets.get("hero_charisma", 10))
 	
 	hero.apply_character_data(
 		player_name,
@@ -688,14 +838,50 @@ func apply_player_presets():
 		loaded_max_movement
 	)
 	
+	hero.apply_attributes(
+		loaded_strength,
+		loaded_dexterity,
+		loaded_constitution,
+		loaded_wisdom,
+		loaded_intelligence,
+		loaded_charisma
+	)
+	hero.apply_race_data(
+	GameState.player_race,
+	GameState.hero_size,
+	GameState.hero_size_modifier,
+	GameState.hero_favored_class,
+	GameState.hero_race_traits
+) 
+	hero.apply_class_data(
+	GameState.hero_class_hit_die,
+	GameState.hero_hp_fixed_per_level,
+	GameState.hero_hp_progression_mode,
+	GameState.hero_base_attack_bonus_type,
+	GameState.hero_fortitude_base_bonus,
+	GameState.hero_reflex_base_bonus,
+	GameState.hero_will_base_bonus,
+	GameState.hero_class_movement_bonus,
+	GameState.hero_damage_reduction,
+	GameState.hero_class_features
+)
 	GameState.player_name = hero.character_name
 	GameState.player_class = hero.character_class
+	
 	GameState.hero_level = hero.level
 	GameState.hero_total_xp = hero.total_xp
 	GameState.hero_xp_to_next_level = hero.xp_to_next_level
+	
 	GameState.hero_max_hp = hero.max_hp
 	GameState.hero_attack_power = hero.attack_power
 	GameState.hero_max_movement_meters = hero.max_movement_meters
+	
+	GameState.hero_strength = hero.strength
+	GameState.hero_dexterity = hero.dexterity
+	GameState.hero_constitution = hero.constitution
+	GameState.hero_wisdom = hero.wisdom
+	GameState.hero_intelligence = hero.intelligence
+	GameState.hero_charisma = hero.charisma
 
 func show_abandon_confirmation():
 	abandon_confirm_popup.popup_centered()
@@ -728,10 +914,12 @@ func update_movement_label():
 	
 	if is_instance_valid(hero):
 		movement_label.text = (
-			hero.character_name + " - " + hero.character_class + "\n" +
-			"Nv " + str(hero.level) + " | XP " + str(hero.get_xp_progress_in_current_level()) + "/" + str(hero.get_xp_needed_for_current_level()) + "\n" +
-			"Vida " + str(hero.hp) + "/" + str(hero.max_hp) + " | Mov " + str(hero.current_movement_meters) + "/" + str(hero.max_movement_meters)
-		)
+	hero.character_name + " - " + hero.character_race + " " + hero.character_class + "\n" +
+	"Nv " + str(hero.level) + " | XP " + str(hero.get_xp_progress_in_current_level()) + "/" + str(hero.get_xp_needed_for_current_level()) + "\n" +
+	"Vida " + str(hero.hp) + "/" + str(hero.max_hp) + " | Mov " + str(hero.current_movement_meters) + "/" + str(hero.max_movement_meters) + "\n" +
+	"Arma: " + hero.equipped_weapon + " | RD " + str(hero.damage_reduction) + " | Fúria " + str(hero.rage_turns_remaining) + "\n" +
+	"CA " + str(hero.get_armor_class()) + " | FORT " + str(hero.get_fortitude_save()) + " | REF " + str(hero.get_reflex_save()) + " | VON " + str(hero.get_will_save())
+)
 	else:
 		movement_label.text = "Herói derrotado"
 	
@@ -745,3 +933,46 @@ func update_movement_label():
 			turn_text + "\n" +
 			"Inimigo derrotado"
 		)
+func can_hero_sneak_attack_enemy() -> bool:
+	if not is_instance_valid(hero):
+		return false
+	
+	if not is_instance_valid(enemy):
+		return false
+	
+	if hero.character_class != "Ladino":
+		return false
+	
+	# Regra temporária:
+	# O inimigo fica vulnerável se ainda não atacou neste combate/turno.
+	# Depois vamos trocar isso por flanqueado, cego, desprevenido ou imobilizado.
+	if enemy.has_opportunity_attacked == false:
+		return true
+	
+	return false
+func use_class_skill():
+	if not is_instance_valid(hero):
+		return
+	
+	if current_turn != TurnState.HERO_TURN:
+		return
+	
+	if hero.character_class == "Bárbaro":
+		hero.activate_rage()
+		update_movement_label()
+		return
+	
+	if hero.character_class == "Paladino":
+		print("Destruir o Mal será aplicado automaticamente no próximo ataque disponível.")
+		update_movement_label()
+		return
+	
+	if hero.character_class == "Monge":
+		print("Bônus de Sabedoria na CA já está ativo passivamente.")
+		return
+	
+	if hero.character_class == "Ladino":
+		print("Ataque Furtivo é aplicado automaticamente quando o inimigo está vulnerável.")
+		return
+	
+	print("Esta classe ainda não possui habilidade ativa implementada.")
