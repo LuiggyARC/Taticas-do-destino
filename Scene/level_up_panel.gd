@@ -1,0 +1,1223 @@
+extends CanvasLayer
+class_name LevelUpPanel
+
+
+signal level_up_confirmed(level_up_data: Dictionary)
+
+
+var level_up_manager: LevelUpManager
+var hero_unit: Node
+var level_up_preview: Dictionary = {}
+
+var interface_root: Control
+var window_panel: PanelContainer
+var content_container: VBoxContainer
+
+var title_label: Label
+var level_label: Label
+var hp_description_label: Label
+var hp_result_label: Label
+var roll_hp_button: Button
+var progression_label: Label
+var validation_label: Label
+var confirm_button: Button
+
+var feat_selection_container: VBoxContainer
+var feat_option_buttons: Array[OptionButton] = []
+var feat_detail_buttons: Array[OptionButton] = []
+var attribute_option_buttons: Array[OptionButton] = []
+
+var spell_section: VBoxContainer
+var spell_list: ItemList
+var spell_instruction_label: Label
+
+var rolled_hp_die: int = 0
+var calculated_hp_gain: int = 0
+var required_spell_choices: int = 0
+
+
+func _ready() -> void:
+	layer = 200
+	level_up_manager = LevelUpManager.new()
+	create_interface()
+	hide_panel()
+
+
+func create_interface() -> void:
+	interface_root = Control.new()
+	interface_root.name = "LevelUpInterfaceRoot"
+	interface_root.set_anchors_and_offsets_preset(
+		Control.PRESET_FULL_RECT
+	)
+	interface_root.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(interface_root)
+	
+	var dark_background := ColorRect.new()
+	dark_background.name = "DarkBackground"
+	dark_background.color = Color(
+		0.0,
+		0.0,
+		0.0,
+		0.82
+	)
+	dark_background.set_anchors_and_offsets_preset(
+		Control.PRESET_FULL_RECT
+	)
+	dark_background.mouse_filter = Control.MOUSE_FILTER_STOP
+	interface_root.add_child(dark_background)
+	
+	window_panel = PanelContainer.new()
+	window_panel.name = "LevelUpWindow"
+	window_panel.set_anchors_preset(
+		Control.PRESET_CENTER
+	)
+	window_panel.offset_left = -420.0
+	window_panel.offset_top = -430.0
+	window_panel.offset_right = 420.0
+	window_panel.offset_bottom = 430.0
+	window_panel.add_theme_stylebox_override(
+		"panel",
+		create_panel_style()
+	)
+	interface_root.add_child(window_panel)
+	
+	var margin_container := MarginContainer.new()
+	margin_container.add_theme_constant_override(
+		"margin_left",
+		24
+	)
+	margin_container.add_theme_constant_override(
+		"margin_right",
+		24
+	)
+	margin_container.add_theme_constant_override(
+		"margin_top",
+		20
+	)
+	margin_container.add_theme_constant_override(
+		"margin_bottom",
+		20
+	)
+	window_panel.add_child(margin_container)
+	
+	var main_container := VBoxContainer.new()
+	main_container.add_theme_constant_override(
+		"separation",
+		12
+	)
+	margin_container.add_child(main_container)
+	
+	title_label = Label.new()
+	title_label.text = "EVOLUÇÃO DE PERSONAGEM"
+	title_label.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+	title_label.add_theme_font_size_override(
+		"font_size",
+		28
+	)
+	title_label.add_theme_color_override(
+		"font_color",
+		Color(0.95, 0.78, 0.30)
+	)
+	title_label.add_theme_color_override(
+		"font_outline_color",
+		Color.BLACK
+	)
+	title_label.add_theme_constant_override(
+		"outline_size",
+		6
+	)
+	main_container.add_child(title_label)
+	
+	level_label = Label.new()
+	level_label.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+	level_label.add_theme_font_size_override(
+		"font_size",
+		20
+	)
+	main_container.add_child(level_label)
+	
+	var separator := HSeparator.new()
+	main_container.add_child(separator)
+	
+	var scroll_container := ScrollContainer.new()
+	scroll_container.size_flags_vertical = (
+		Control.SIZE_EXPAND_FILL
+	)
+	scroll_container.horizontal_scroll_mode = (
+		ScrollContainer.SCROLL_MODE_DISABLED
+	)
+	main_container.add_child(scroll_container)
+	
+	content_container = VBoxContainer.new()
+	content_container.size_flags_horizontal = (
+		Control.SIZE_EXPAND_FILL
+	)
+	content_container.add_theme_constant_override(
+		"separation",
+		14
+	)
+	scroll_container.add_child(content_container)
+	
+	validation_label = Label.new()
+	validation_label.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+	validation_label.autowrap_mode = (
+		TextServer.AUTOWRAP_WORD_SMART
+	)
+	validation_label.add_theme_font_size_override(
+		"font_size",
+		16
+	)
+	validation_label.add_theme_color_override(
+		"font_color",
+		Color(1.0, 0.42, 0.35)
+	)
+	main_container.add_child(validation_label)
+	
+	confirm_button = Button.new()
+	confirm_button.text = "Confirmar evolução"
+	confirm_button.custom_minimum_size = Vector2(
+		0,
+		48
+	)
+	confirm_button.add_theme_font_size_override(
+		"font_size",
+		19
+	)
+	confirm_button.pressed.connect(
+		on_confirm_button_pressed
+	)
+	main_container.add_child(confirm_button)
+
+
+func open_for_hero(
+	new_hero_unit: Node,
+	target_level: int = -1
+) -> void:
+	if not is_instance_valid(new_hero_unit):
+		return
+	
+	hero_unit = new_hero_unit
+	
+	level_up_preview = (
+		level_up_manager.get_level_up_preview(
+			hero_unit,
+			target_level
+		)
+	)
+	
+	if level_up_preview.is_empty():
+		return
+	
+	reset_selections()
+	rebuild_level_up_content()
+	interface_root.visible = true
+
+
+func hide_panel() -> void:
+	if is_instance_valid(interface_root):
+		interface_root.visible = false
+
+
+func reset_selections() -> void:
+	rolled_hp_die = 0
+	calculated_hp_gain = 0
+	required_spell_choices = 0
+	feat_option_buttons.clear()
+	feat_detail_buttons.clear()
+	attribute_option_buttons.clear()
+	validation_label.text = ""
+
+
+func rebuild_level_up_content() -> void:
+	clear_content_container()
+	
+	var current_level: int = int(
+		level_up_preview.get(
+			"current_level",
+			1
+		)
+	)
+	
+	var new_level: int = int(
+		level_up_preview.get(
+			"new_level",
+			current_level + 1
+		)
+	)
+	
+	level_label.text = (
+		str(hero_unit.character_name)
+		+ " — Nível "
+		+ str(current_level)
+		+ " → "
+		+ str(new_level)
+	)
+	
+	create_hp_section()
+	create_progression_section()
+	create_attribute_section()
+	create_feat_section()
+	create_spell_section()
+	
+	validation_label.text = ""
+	confirm_button.disabled = false
+
+
+func clear_content_container() -> void:
+	if not is_instance_valid(content_container):
+		return
+	
+	for child in content_container.get_children():
+		child.free()
+
+func create_attribute_section() -> void:
+	var point_count: int = int(level_up_preview.get("attribute_point_count", 0))
+	if point_count <= 0:
+		return
+	var section: PanelContainer = create_section_panel("Pontos de atributo — escolha %d" % point_count)
+	content_container.add_child(section)
+	var section_content: VBoxContainer = section.get_meta("content") as VBoxContainer
+	var explanation := Label.new()
+	explanation.text = "A cada 4 níveis, todas as raças distribuem 2 pontos. Meio-Elfo distribui 3. Você pode repetir um atributo."
+	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	section_content.add_child(explanation)
+	for point_index in range(point_count):
+		var option := OptionButton.new()
+		option.custom_minimum_size.y = 72 if OS.has_feature("mobile") else 50
+		option.add_theme_font_size_override("font_size", 28 if OS.has_feature("mobile") else 20)
+		option.add_item("Escolha o atributo para o ponto %d" % (point_index + 1))
+		for attribute_name in ["Força", "Destreza", "Constituição", "Sabedoria", "Inteligência", "Carisma"]:
+			option.add_item(attribute_name)
+		option.select(0)
+		section_content.add_child(option)
+		attribute_option_buttons.append(option)
+
+func get_selected_attribute_increases() -> Dictionary:
+	var attribute_keys: Array[String] = ["strength", "dexterity", "constitution", "wisdom", "intelligence", "charisma"]
+	var increases: Dictionary = {}
+	for option in attribute_option_buttons:
+		if option.selected <= 0:
+			return {}
+		var key: String = attribute_keys[option.selected - 1]
+		increases[key] = int(increases.get(key, 0)) + 1
+	return increases
+
+
+func create_hp_section() -> void:
+	var section := create_section_panel(
+		"Pontos de Vida"
+	)
+	
+	content_container.add_child(section)
+	
+	var section_content: VBoxContainer = (
+		section.get_meta("content")
+	)
+	
+	var hit_die: int = int(
+		level_up_preview.get(
+			"hit_die",
+			1
+		)
+	)
+	
+	var fixed_hp: int = int(
+		level_up_preview.get(
+			"fixed_hp",
+			1
+		)
+	)
+	
+	var constitution_modifier: int = int(
+		level_up_preview.get(
+			"constitution_modifier",
+			0
+		)
+	)
+	
+	var hp_mode: String = str(
+		level_up_preview.get(
+			"hp_progression_mode",
+			"fixed"
+		)
+	)
+	
+	hp_description_label = Label.new()
+	hp_description_label.autowrap_mode = (
+		TextServer.AUTOWRAP_WORD_SMART
+	)
+	section_content.add_child(
+		hp_description_label
+	)
+	
+	hp_result_label = Label.new()
+	hp_result_label.horizontal_alignment = (
+		HORIZONTAL_ALIGNMENT_CENTER
+	)
+	hp_result_label.add_theme_font_size_override(
+		"font_size",
+		20
+	)
+	hp_result_label.add_theme_color_override(
+		"font_color",
+		Color(0.45, 1.0, 0.52)
+	)
+	section_content.add_child(
+		hp_result_label
+	)
+	
+	roll_hp_button = Button.new()
+	roll_hp_button.text = (
+		"Rolar vida — 1d"
+		+ str(hit_die)
+	)
+	roll_hp_button.custom_minimum_size = Vector2(
+		0,
+		42
+	)
+	roll_hp_button.pressed.connect(
+		on_roll_hp_button_pressed
+	)
+	section_content.add_child(
+		roll_hp_button
+	)
+	
+	if hp_mode == "roll":
+		hp_description_label.text = (
+			"Role 1d"
+			+ str(hit_die)
+			+ " e some o modificador de Constituição "
+			+ format_modifier(
+				constitution_modifier
+			)
+			+ ". A rolagem poderá ser feita apenas uma vez."
+		)
+		
+		hp_result_label.text = (
+			"Aguardando rolagem"
+		)
+		
+		roll_hp_button.visible = true
+		roll_hp_button.disabled = false
+	else:
+		calculated_hp_gain = max(
+			1,
+			fixed_hp + constitution_modifier
+		)
+		
+		hp_description_label.text = (
+			"Progressão fixa: "
+			+ str(fixed_hp)
+			+ " + Constituição "
+			+ format_modifier(
+				constitution_modifier
+			)
+		)
+		
+		hp_result_label.text = (
+			"Vida máxima aumentará em "
+			+ str(calculated_hp_gain)
+		)
+		
+		roll_hp_button.visible = false
+	if str(hero_unit.character_race) == "Anão":
+		hp_description_label.text += "\nSangue de Ferro: +1 PV máximo extra neste nível."
+		if hp_mode != "roll":
+			hp_result_label.text = "Vida máxima aumentará em %d (inclui Sangue de Ferro)" % (calculated_hp_gain + 1)
+
+
+func create_progression_section() -> void:
+	var section := create_section_panel(
+		"Progressão da Classe"
+	)
+	
+	content_container.add_child(section)
+	
+	var section_content: VBoxContainer = (
+		section.get_meta("content")
+	)
+	
+	progression_label = Label.new()
+	progression_label.autowrap_mode = (
+		TextServer.AUTOWRAP_WORD_SMART
+	)
+	progression_label.add_theme_font_size_override(
+		"font_size",
+		17
+	)
+	section_content.add_child(
+		progression_label
+	)
+	
+	var progression_lines: Array[String] = []
+	
+	append_progression_line(
+		progression_lines,
+		"Bônus Base de Ataque",
+		int(
+			level_up_preview.get(
+				"current_base_attack_bonus",
+				0
+			)
+		),
+		int(
+			level_up_preview.get(
+				"new_base_attack_bonus",
+				0
+			)
+		)
+	)
+	
+	append_progression_line(
+		progression_lines,
+		"Fortitude",
+		int(
+			level_up_preview.get(
+				"current_fortitude",
+				0
+			)
+		),
+		int(
+			level_up_preview.get(
+				"new_fortitude",
+				0
+			)
+		)
+	)
+	
+	append_progression_line(
+		progression_lines,
+		"Reflexos",
+		int(
+			level_up_preview.get(
+				"current_reflex",
+				0
+			)
+		),
+		int(
+			level_up_preview.get(
+				"new_reflex",
+				0
+			)
+		)
+	)
+	
+	append_progression_line(
+		progression_lines,
+		"Vontade",
+		int(
+			level_up_preview.get(
+				"current_will",
+				0
+			)
+		),
+		int(
+			level_up_preview.get(
+				"new_will",
+				0
+			)
+		)
+	)
+	
+	var current_slots: Dictionary = (
+		level_up_preview.get(
+			"current_spell_slots",
+			{}
+		)
+	)
+	
+	var new_slots: Dictionary = (
+		level_up_preview.get(
+			"new_spell_slots",
+			{}
+		)
+	)
+	
+	for spell_level in [0, 1, 2]:
+		append_progression_line(
+			progression_lines,
+			"Espaços de magia — círculo "
+			+ str(spell_level),
+			int(
+				current_slots.get(
+					spell_level,
+					0
+				)
+			),
+			int(
+				new_slots.get(
+					spell_level,
+					0
+				)
+			)
+		)
+	
+	if progression_lines.is_empty():
+		progression_label.text = (
+			"Nenhuma progressão automática "
+			+ "neste nível."
+		)
+	else:
+		progression_label.text = (
+			"\n".join(
+				progression_lines
+			)
+		)
+
+
+func append_progression_line(
+	lines: Array[String],
+	stat_name: String,
+	old_value: int,
+	new_value: int
+) -> void:
+	if old_value == new_value:
+		return
+	
+	lines.append(
+		stat_name
+		+ ": "
+		+ format_modifier(old_value)
+		+ " → "
+		+ format_modifier(new_value)
+	)
+
+
+func create_feat_section() -> void:
+	var feat_choices: Array = (
+		level_up_preview.get(
+			"feat_choices",
+			[]
+		)
+	)
+	
+	var section := create_section_panel(
+		"Talentos"
+	)
+	
+	content_container.add_child(section)
+	
+	feat_selection_container = (
+		section.get_meta("content")
+	)
+	
+	if feat_choices.is_empty():
+		var no_feat_label := Label.new()
+		no_feat_label.text = (
+			"Nenhum novo talento é recebido neste nível."
+		)
+		no_feat_label.autowrap_mode = (
+			TextServer.AUTOWRAP_WORD_SMART
+		)
+		no_feat_label.add_theme_color_override(
+			"font_color",
+			Color(0.72, 0.72, 0.76)
+		)
+		feat_selection_container.add_child(
+			no_feat_label
+		)
+		
+		return
+	
+	for choice_data_value in feat_choices:
+		var choice_data: Dictionary = (
+			choice_data_value
+		)
+		
+		var choice_title := Label.new()
+		choice_title.text = str(
+			choice_data.get(
+				"title",
+				"Escolha um talento"
+			)
+		)
+		choice_title.add_theme_font_size_override(
+			"font_size",
+			16
+		)
+		feat_selection_container.add_child(
+			choice_title
+		)
+		
+		var feat_option := OptionButton.new()
+		feat_option.custom_minimum_size = Vector2(
+			0,
+			42
+		)
+		feat_option.add_item(
+			"Selecione um talento..."
+		)
+		feat_option.set_item_disabled(
+			0,
+			true
+		)
+		
+		var available_feats: Array = (
+			choice_data.get(
+				"available_feats",
+				[]
+			)
+		)
+		
+		for feat_name_value in available_feats:
+			feat_option.add_item(
+				str(feat_name_value)
+			)
+		
+		feat_option_buttons.append(
+			feat_option
+		)
+		
+		feat_selection_container.add_child(
+			feat_option
+		)
+		var detail_option := OptionButton.new()
+		detail_option.custom_minimum_size = Vector2(0, 42)
+		detail_option.visible = false
+		feat_detail_buttons.append(detail_option)
+		feat_selection_container.add_child(detail_option)
+		var slot_index: int = feat_option_buttons.size() - 1
+		feat_option.item_selected.connect(on_level_up_feat_selected.bind(slot_index))
+
+
+func on_level_up_feat_selected(_selected: int, slot_index: int) -> void:
+	update_feat_detail_option(slot_index)
+
+
+func update_feat_detail_option(slot_index: int) -> void:
+	var feat_option: OptionButton = feat_option_buttons[slot_index]
+	var detail_option: OptionButton = feat_detail_buttons[slot_index]
+	detail_option.clear()
+	detail_option.visible = false
+	if feat_option.selected <= 0:
+		return
+	var feat_name: String = feat_option.get_item_text(feat_option.selected)
+	var feat_data: Dictionary = FeatDatabase.get_feat_data(feat_name)
+	var choice_type: String = str(feat_data.get("choice_type", ""))
+	if choice_type == "":
+		return
+	var choices: Array = feat_data.get("choices", []).duplicate()
+	if choice_type == "weapon_specialization" or choice_type == "spell_specialization":
+		choices.clear()
+		var required_base: String = "Foco em Arma" if choice_type == "weapon_specialization" else "Foco em Magia"
+		var existing_feats: Array = hero_unit.get("selected_feats") if is_instance_valid(hero_unit) else []
+		for selected_feat in existing_feats:
+			var full_name: String = str(selected_feat)
+			if full_name.begins_with(required_base + ":"):
+				choices.append(full_name.split(":", false, 1)[1].strip_edges())
+	detail_option.add_item("Escolha a especialidade...")
+	detail_option.set_item_disabled(0, true)
+	for choice in choices:
+		detail_option.add_item(str(choice))
+	detail_option.visible = true
+
+
+func create_spell_section() -> void:
+	required_spell_choices = int(
+		level_up_preview.get(
+			"spell_choice_count",
+			0
+		)
+	)
+	
+	var is_spellcaster: bool = bool(
+		level_up_preview.get(
+			"is_spellcaster",
+			false
+		)
+	)
+	
+	if not is_spellcaster:
+		return
+	
+	var available_spells: Array = (
+		level_up_preview.get(
+			"available_spells",
+			[]
+		)
+	)
+	
+	var section := create_section_panel(
+		"Novas Magias"
+	)
+	
+	content_container.add_child(section)
+	
+	spell_section = section.get_meta(
+		"content"
+	)
+	
+	if required_spell_choices <= 0:
+		var no_spell_choice_label := Label.new()
+		
+		var character_class: String = str(
+			level_up_preview.get(
+				"character_class",
+				""
+			)
+		)
+		
+		if character_class in [
+			"Clérigo",
+			"Druida"
+		]:
+			no_spell_choice_label.text = (
+				"As magias disponíveis para a classe "
+				+ "serão atualizadas automaticamente."
+			)
+		else:
+			no_spell_choice_label.text = (
+				"Nenhuma nova escolha de magia "
+				+ "é recebida neste nível."
+			)
+		
+		no_spell_choice_label.autowrap_mode = (
+			TextServer.AUTOWRAP_WORD_SMART
+		)
+		no_spell_choice_label.add_theme_color_override(
+			"font_color",
+			Color(0.72, 0.72, 0.76)
+		)
+		spell_section.add_child(
+			no_spell_choice_label
+		)
+		
+		return
+	
+	if available_spells.is_empty():
+		var no_available_spell_label := Label.new()
+		no_available_spell_label.text = (
+			"Não existem novas magias disponíveis "
+			+ "para este nível."
+		)
+		no_available_spell_label.autowrap_mode = (
+			TextServer.AUTOWRAP_WORD_SMART
+		)
+		no_available_spell_label.add_theme_color_override(
+			"font_color",
+			Color(0.72, 0.72, 0.76)
+		)
+		spell_section.add_child(
+			no_available_spell_label
+		)
+		
+		required_spell_choices = 0
+		return
+	
+	spell_instruction_label = Label.new()
+	spell_instruction_label.text = (
+		"Escolha "
+		+ str(required_spell_choices)
+		+ (
+			" magia."
+			if required_spell_choices == 1
+			else " magias."
+		)
+	)
+	spell_instruction_label.add_theme_font_size_override(
+		"font_size",
+		16
+	)
+	spell_section.add_child(
+		spell_instruction_label
+	)
+	
+	spell_list = ItemList.new()
+	spell_list.custom_minimum_size = Vector2(
+		0,
+		min(
+			260,
+			70 + available_spells.size() * 32
+		)
+	)
+	spell_list.select_mode = (
+		ItemList.SELECT_MULTI
+	)
+	spell_list.allow_reselect = true
+	spell_section.add_child(
+		spell_list
+	)
+	
+	for spell_name_value in available_spells:
+		var spell_name: String = str(
+			spell_name_value
+		)
+		
+		var spell_data: Dictionary = (
+			SpellDatabase.get_spell_data(
+				spell_name
+			)
+		)
+		
+		var spell_level: int = int(
+			spell_data.get(
+				"level",
+				0
+			)
+		)
+		
+		spell_list.add_item(
+			spell_name
+			+ " — círculo "
+			+ str(spell_level)
+		)
+		
+		spell_list.set_item_metadata(
+			spell_list.item_count - 1,
+			spell_name
+		)
+
+
+func create_section_panel(
+	section_title: String
+) -> PanelContainer:
+	var section_panel := PanelContainer.new()
+	section_panel.size_flags_horizontal = (
+		Control.SIZE_EXPAND_FILL
+	)
+	section_panel.add_theme_stylebox_override(
+		"panel",
+		create_section_style()
+	)
+	
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override(
+		"margin_left",
+		14
+	)
+	margin.add_theme_constant_override(
+		"margin_right",
+		14
+	)
+	margin.add_theme_constant_override(
+		"margin_top",
+		12
+	)
+	margin.add_theme_constant_override(
+		"margin_bottom",
+		12
+	)
+	section_panel.add_child(margin)
+	
+	var section_content := VBoxContainer.new()
+	section_content.size_flags_horizontal = (
+		Control.SIZE_EXPAND_FILL
+	)
+	section_content.add_theme_constant_override(
+		"separation",
+		8
+	)
+	margin.add_child(section_content)
+	
+	var section_title_label := Label.new()
+	section_title_label.text = section_title
+	section_title_label.add_theme_font_size_override(
+		"font_size",
+		20
+	)
+	section_title_label.add_theme_color_override(
+		"font_color",
+		Color(0.94, 0.75, 0.28)
+	)
+	section_content.add_child(
+		section_title_label
+	)
+	
+	section_panel.set_meta(
+		"content",
+		section_content
+	)
+	
+	return section_panel
+
+
+func create_panel_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(
+		0.055,
+		0.055,
+		0.075,
+		0.98
+	)
+	style.border_color = Color(
+		0.72,
+		0.52,
+		0.14,
+		1.0
+	)
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(12)
+	return style
+
+
+func create_section_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(
+		0.10,
+		0.10,
+		0.13,
+		0.96
+	)
+	style.border_color = Color(
+		0.30,
+		0.27,
+		0.20,
+		1.0
+	)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(7)
+	return style
+
+
+func on_roll_hp_button_pressed() -> void:
+	if rolled_hp_die > 0:
+		return
+	
+	var hit_die: int = max(
+		1,
+		int(
+			level_up_preview.get(
+				"hit_die",
+				1
+			)
+		)
+	)
+	
+	var constitution_modifier: int = int(
+		level_up_preview.get(
+			"constitution_modifier",
+			0
+		)
+	)
+	
+	rolled_hp_die = randi_range(
+		1,
+		hit_die
+	)
+	
+	calculated_hp_gain = max(
+		1,
+		rolled_hp_die
+		+ constitution_modifier
+	)
+	
+	hp_result_label.text = (
+		"1d"
+		+ str(hit_die)
+		+ ": "
+		+ str(rolled_hp_die)
+		+ " "
+		+ format_modifier(
+			constitution_modifier
+		)
+		+ " = "
+		+ str(calculated_hp_gain)
+		+ " pontos de vida"
+	)
+	if str(hero_unit.character_race) == "Anão":
+		hp_result_label.text += " +1 Sangue de Ferro"
+	
+	roll_hp_button.disabled = true
+	roll_hp_button.text = "Vida rolada"
+
+
+func on_confirm_button_pressed() -> void:
+	validation_label.text = ""
+	
+	if not validate_hp_selection():
+		return
+	var attribute_increases: Dictionary = get_selected_attribute_increases()
+	if not attribute_option_buttons.is_empty() and attribute_increases.is_empty():
+		validation_label.text = "Distribua todos os pontos de atributo antes de continuar."
+		return
+	
+	var selected_feats: Array[String] = (
+		get_selected_feats()
+	)
+	
+	if selected_feats.size() != (
+		feat_option_buttons.size()
+	):
+		validation_label.text = (
+			"Escolha todos os talentos disponíveis."
+		)
+		return
+	
+	if has_duplicate_strings(
+		selected_feats
+	):
+		validation_label.text = (
+			"Não é possível escolher o mesmo "
+			+ "talento duas vezes."
+		)
+		return
+	
+	var selected_spells: Array[String] = (
+		get_selected_spells()
+	)
+	
+	if selected_spells.size() != (
+		required_spell_choices
+	):
+		validation_label.text = (
+			"Escolha exatamente "
+			+ str(required_spell_choices)
+			+ (
+				" magia."
+				if required_spell_choices == 1
+				else " magias."
+			)
+		)
+		return
+	
+	var result: Dictionary = {
+		"current_level": int(
+			level_up_preview.get(
+				"current_level",
+				1
+			)
+		),
+		"new_level": int(
+			level_up_preview.get(
+				"new_level",
+				2
+			)
+		),
+		"hp_die_roll": rolled_hp_die,
+		"hp_gain": calculated_hp_gain,
+		"attribute_increases": attribute_increases,
+		"selected_feats": selected_feats,
+		"selected_spells": selected_spells,
+		"new_base_attack_bonus": int(
+			level_up_preview.get(
+				"new_base_attack_bonus",
+				0
+			)
+		),
+		"new_fortitude": int(
+			level_up_preview.get(
+				"new_fortitude",
+				0
+			)
+		),
+		"new_reflex": int(
+			level_up_preview.get(
+				"new_reflex",
+				0
+			)
+		),
+		"new_will": int(
+			level_up_preview.get(
+				"new_will",
+				0
+			)
+		),
+		"new_spell_slots": (
+			level_up_preview.get(
+				"new_spell_slots",
+				{}
+			)
+		)
+	}
+	
+	confirm_button.disabled = true
+	
+	level_up_confirmed.emit(
+		result
+	)
+
+
+func validate_hp_selection() -> bool:
+	var hp_mode: String = str(
+		level_up_preview.get(
+			"hp_progression_mode",
+			"fixed"
+		)
+	)
+	
+	if hp_mode == "roll" and rolled_hp_die <= 0:
+		validation_label.text = (
+			"Role os pontos de vida antes de continuar."
+		)
+		return false
+	
+	if calculated_hp_gain <= 0:
+		validation_label.text = (
+			"Não foi possível calcular os pontos de vida."
+		)
+		return false
+	
+	return true
+
+
+func get_selected_feats() -> Array[String]:
+	var result: Array[String] = []
+	
+	for feat_option in feat_option_buttons:
+		if not is_instance_valid(feat_option):
+			continue
+		
+		if feat_option.selected <= 0:
+			continue
+		
+		var slot_index: int = feat_option_buttons.find(feat_option)
+		var feat_name: String = feat_option.get_item_text(feat_option.selected)
+		var detail_option: OptionButton = feat_detail_buttons[slot_index]
+		if detail_option.visible:
+			if detail_option.selected <= 0:
+				continue
+			feat_name += ": " + detail_option.get_item_text(detail_option.selected)
+		result.append(feat_name)
+	
+	return result
+
+
+func get_selected_spells() -> Array[String]:
+	var result: Array[String] = []
+	
+	if not is_instance_valid(spell_list):
+		return result
+	
+	var selected_indexes: PackedInt32Array = (
+		spell_list.get_selected_items()
+	)
+	
+	for selected_index in selected_indexes:
+		result.append(
+			str(
+				spell_list.get_item_metadata(
+					selected_index
+				)
+			)
+		)
+	
+	return result
+
+
+func has_duplicate_strings(
+	values: Array[String]
+) -> bool:
+	var unique_values: Dictionary = {}
+	
+	for value in values:
+		if unique_values.has(value):
+			return true
+		
+		unique_values[value] = true
+	
+	return false
+
+
+func format_modifier(
+	value: int
+) -> String:
+	if value >= 0:
+		return "+" + str(value)
+	
+	return str(value)

@@ -3,10 +3,12 @@ extends Node
 var should_load_save: bool = false
 var selected_save_path: String = ""
 var selected_stage: int = 1
+var current_location: String = "battle"
 
 var player_name: String = "Herói"
 var player_class: String = "Sem Classe"
 var player_race: String = "Humano"
+var player_portrait_path: String = ""
 
 var hero_max_hp: int = 100
 var hero_attack_power: int = 20
@@ -41,6 +43,24 @@ var hero_fortitude_base_bonus: int = 2
 var hero_reflex_base_bonus: int = 2
 var hero_will_base_bonus: int = 0
 
+var show_attack_roll_box: bool = true
 var hero_class_movement_bonus: float = 0.0
 var hero_damage_reduction: int = 0
 var hero_class_features: Array = []
+
+var hero_feats: Array = []
+var hero_known_spells: Array = []
+
+var hero_spell_slots_level_0: int = 0
+var hero_spell_slots_level_1: int = 0
+var hero_spell_slots_level_2: int = 0
+
+var hero_max_spell_slots_level_0: int = 0
+var hero_max_spell_slots_level_1: int = 0
+var hero_max_spell_slots_level_2: int = 0
+
+var hero_equipped_weapon: String = "Espada Curta"
+var hero_equipped_armor: String = "Roupa Comum"
+var hero_equipped_shield: String = "Nenhum"
+var hero_gold: int = 5
+var hero_animal_companion_type: String = "Lobo"

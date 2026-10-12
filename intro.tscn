@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://ccqf20nnea44a"]
+
+[ext_resource type="Script" uid="uid://biensawyxrx5b" path="res://intro.gd" id="1_s2ta7"]
+
+[node name="Intro" type="Control" unique_id=297672795]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_s2ta7")

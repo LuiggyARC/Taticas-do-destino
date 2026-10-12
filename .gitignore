@@ -1,3 +1,8 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+# Android test builds and signatures
+/*.apk
+/*.apk.idsig
+# The game uses the OGV version; this source MP4 exceeds GitHub's file limit.
+/Assets/UI/Intro/Historiamundo.mp4

@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://68dhs8tx63i3"]
+
+[ext_resource type="Script" uid="uid://becyv7r2k7qb5" path="res://Scene/units/animal_companion.gd" id="1_qqp40"]
+
+[node name="AnimalCompanion" type="Node2D" unique_id=1304821840]
+modulate = Color(0.49094266, 0.2430565, 1.4439226e-07, 1)
+script = ExtResource("1_qqp40")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=534888862]
+clip_contents = true
+offset_left = -16.0
+offset_top = -16.0
+offset_right = 16.0
+offset_bottom = 16.0
+color = Color(0.73255825, 0.35741952, 1.92523e-07, 1)

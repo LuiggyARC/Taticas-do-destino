@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://byo7dve4gwdc2"
+path="res://.godot/imported/Wolfintro (3).mp3-3c97cd5df1dc51e4c82e1b23f8bb0e25.mp3str"
+
+[deps]
+
+source_file="res://Assets/Audio/SFX/Wolfintro (3).mp3"
+dest_files=["res://.godot/imported/Wolfintro (3).mp3-3c97cd5df1dc51e4c82e1b23f8bb0e25.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

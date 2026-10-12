@@ -11,14 +11,26 @@ config_version=5
 [application]
 
 config/name="Taticas do destino"
-run/main_scene="uid://bsks5mgia1ck8"
+run/main_scene="res://intro.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
-boot_splash/bg_color=Color(0.2818458, 0, 0.1375142, 1)
+boot_splash/bg_color=Color(0, 0.16339153, 0.19312549, 1)
+boot_splash/stretch_mode=0
 config/icon="res://icon.svg"
 
 [autoload]
 
 GameState="*uid://bqu34sey7lmuf"
+MusicManage="*uid://bebkv68nymxc8"
+UIAudioManager="*uid://4p3llwujii8l"
+SpellDatabase="*uid://c60hj28bqcd3l"
+FeatDatabase="*uid://drqdfvxnhw7eq"
+MonsterDatabase="*uid://cnm7xqxbb162o"
+PartyManager="*uid://citxbti0l8utu"
+SaveManager="*uid://dg2vd5683kjf5"
+ItemDatabase="*uid://chkn1eval8kgq"
+InventoryManager="*uid://d2cwrsjqi3jb4"
+ShopDatabase="*uid://drhjiuprorbmq"
+MissionManager="*uid://b5pfludwn1pjx"
 
 [display]
 
@@ -33,3 +45,4 @@ window/size/viewport_height=1024
 
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true
