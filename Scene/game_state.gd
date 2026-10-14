@@ -17,7 +17,7 @@ var hero_max_movement_meters: float = 9.0
 var hero_level: int = 1
 var hero_total_xp: int = 0
 var hero_xp_to_next_level: int = 1000
-var hero_max_level: int = 20
+var hero_max_level: int = 30
 
 var hero_strength: int = 10      # FOR
 var hero_dexterity: int = 10     # DES
@@ -49,6 +49,7 @@ var hero_damage_reduction: int = 0
 var hero_class_features: Array = []
 
 var hero_feats: Array = []
+var hero_class_power_choices: Dictionary = {}
 var hero_known_spells: Array = []
 
 var hero_spell_slots_level_0: int = 0

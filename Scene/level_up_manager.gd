@@ -1,15 +1,16 @@
 extends RefCounted
 class_name LevelUpManager
 
+const LevelProgressionData = preload("res://Scene/level_progression.gd")
+const ClassPowerProgressionData = preload("res://Scene/class_power_progression.gd")
+
 
 const SPELLCASTING_CLASSES: Array[String] = [
 	"Bardo",
 	"Clérigo",
 	"Druida",
 	"Feiticeiro",
-	"Mago",
-	"Paladino",
-	"Ranger"
+	"Mago"
 ]
 
 
@@ -94,7 +95,10 @@ func get_level_up_preview(
 		"new_level": new_level,
 		"character_class": character_class,
 		"character_race": character_race,
-		"attribute_point_count": (2 + (1 if character_race == "Meio-Elfo" else 0)) if new_level % 4 == 0 else 0,
+		"attribute_point_count": LevelProgressionData.attribute_points(new_level, character_race),
+		"level_gains": LevelProgressionData.gains_for_level(new_level, character_race, ClassPowerProgressionData.has_class(character_class)),
+		"current_xp_threshold": LevelProgressionData.xp_for_level(current_level),
+		"new_xp_threshold": LevelProgressionData.xp_for_level(new_level),
 		
 		"hit_die": int(hero_unit.class_hit_die),
 		"fixed_hp": int(hero_unit.hp_fixed_per_level),
@@ -315,10 +319,7 @@ func get_feat_choices(
 func get_general_feat_choice_count(
 	new_level: int
 ) -> int:
-	if new_level > 1 and new_level % 3 == 0:
-		return 1
-	
-	return 0
+	return LevelProgressionData.general_feat_count(new_level)
 
 
 func get_combat_feat_choice_count(
@@ -401,25 +402,6 @@ func get_spell_choice_count(
 		"Bardo", "Feiticeiro":
 			return 1
 		
-		"Paladino", "Ranger":
-			var previous_spell_level: int = (
-				get_max_spell_level_for_class(
-					character_class,
-					new_level - 1
-				)
-			)
-			
-			var new_spell_level: int = (
-				get_max_spell_level_for_class(
-					character_class,
-					new_level
-				)
-			)
-			
-			# Paladino e Ranger escolhem uma magia
-			# somente quando liberam um novo círculo.
-			if new_spell_level > previous_spell_level:
-				return 1
 	
 	return 0
 
@@ -520,12 +502,6 @@ func get_max_spell_level_for_class(
 			if character_level >= 1:
 				return 1
 		
-		"Paladino", "Ranger":
-			if character_level >= 7:
-				return 2
-			
-			if character_level >= 4:
-				return 1
 	
 	return -1
 
@@ -615,22 +591,6 @@ func get_spell_slot_limits(
 					)
 				)
 		
-		"Paladino", "Ranger":
-			if safe_level >= 4:
-				slots[1] = min(
-					4,
-					1 + int(
-						(safe_level - 4) / 3
-					)
-				)
-			
-			if safe_level >= 7:
-				slots[2] = min(
-					3,
-					1 + int(
-						(safe_level - 7) / 3
-					)
-				)
 	
 	# O bônus é da classe e só se aplica a círculos já desbloqueados.
 	# Quando os círculos 3 e 4 tiverem progressão, receberão o mesmo bônus.

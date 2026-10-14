@@ -1,8 +1,10 @@
 extends Node
 
+const LevelProgressionData = preload("res://Scene/level_progression.gd")
+
 
 const MAX_ACTIVE_MEMBERS: int = 5
-const MAX_MEMBER_LEVEL: int = 20
+const MAX_MEMBER_LEVEL: int = 30
 const HERO_MEMBER_ID: String = "hero"
 const NPC_DATABASE_SCRIPT = preload(
 	"res://Scene/npc_database.gd"
@@ -49,31 +51,14 @@ func create_default_member(
 		"personal_inventory": [],
 		"feats": [],
 		"features": [],
+		"daily_powers_used": [],
 		"available": true
 	}
 
 func get_total_xp_required_for_member_level(
 	target_level: int
 ) -> int:
-	if target_level <= 1:
-		return 0
-
-	var total_required: int = 0
-	var xp_step: float = 1000.0
-
-	for level_index in range(
-		2,
-		target_level + 1
-	):
-		total_required += int(
-			round(
-				xp_step
-			)
-		)
-
-		xp_step *= 1.5
-
-	return total_required
+	return LevelProgressionData.xp_for_level(target_level)
 
 
 func calculate_member_level_from_xp(
@@ -462,6 +447,9 @@ func sync_hero_from_game_state() -> void:
 	)
 	
 	if not previous_hero_data.is_empty():
+		hero_data["daily_powers_used"] = (
+			previous_hero_data.get("daily_powers_used", [])
+		).duplicate()
 		hero_data["personal_inventory"] = (
 			previous_hero_data.get(
 				"personal_inventory",
@@ -585,6 +573,24 @@ func get_member(
 	return member_data.duplicate(true)
 
 
+func is_daily_power_available(member_id: String, power_id: String) -> bool:
+	if not members.has(member_id):
+		return false
+	var used: Array = members[member_id].get("daily_powers_used", [])
+	return not used.has(power_id)
+
+
+func consume_daily_power(member_id: String, power_id: String) -> bool:
+	if not is_daily_power_available(member_id, power_id):
+		return false
+	var member_data: Dictionary = members[member_id]
+	var used: Array = member_data.get("daily_powers_used", []).duplicate()
+	used.append(power_id)
+	member_data["daily_powers_used"] = used
+	members[member_id] = member_data
+	return true
+
+
 func get_all_members() -> Array[Dictionary]:
 	var all_members: Array[Dictionary] = []
 	
@@ -684,6 +690,7 @@ func restore_active_party_after_rest() -> void:
 		var member_data: Dictionary = (
 			members[member_id].duplicate(true)
 		)
+		member_data["daily_powers_used"] = []
 		
 		var maximum_hp: int = max(
 			1,

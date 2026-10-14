@@ -22,6 +22,9 @@ var companion_type: String = "Lobo"
 
 var max_hp: int = 18
 var hp: int = 18
+var health_name_label: Label
+var health_bar_background: ColorRect
+var health_bar_fill: ColorRect
 
 var strength: int = 14
 var dexterity: int = 15
@@ -70,6 +73,7 @@ func _ready() -> void:
 	visible = true
 	
 	update_world_position()
+	create_health_bar()
 	update_health_display()
 
 
@@ -325,10 +329,49 @@ func heal(
 
 
 func update_health_display() -> void:
+	if is_instance_valid(health_name_label):
+		health_name_label.text = companion_name
+
+	if is_instance_valid(health_bar_fill):
+		var hp_ratio: float = 0.0
+		if max_hp > 0:
+			hp_ratio = clampf(float(hp) / float(max_hp), 0.0, 1.0)
+		health_bar_fill.size.x = 50.0 * hp_ratio
+
 	health_changed.emit(
 		hp,
 		max_hp
 	)
+
+
+func create_health_bar() -> void:
+	health_name_label = Label.new()
+	health_name_label.name = "HealthNameLabel"
+	health_name_label.position = Vector2(-60, -58)
+	health_name_label.size = Vector2(120, 20)
+	health_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	health_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	health_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health_name_label.z_index = 22
+	add_child(health_name_label)
+
+	health_bar_background = ColorRect.new()
+	health_bar_background.name = "HealthBarBackground"
+	health_bar_background.position = Vector2(-27, -38)
+	health_bar_background.size = Vector2(54, 8)
+	health_bar_background.color = Color(0.05, 0.05, 0.05, 0.9)
+	health_bar_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health_bar_background.z_index = 20
+	add_child(health_bar_background)
+
+	health_bar_fill = ColorRect.new()
+	health_bar_fill.name = "HealthBarFill"
+	health_bar_fill.position = Vector2(2, 2)
+	health_bar_fill.size = Vector2(50, 4)
+	health_bar_fill.color = Color(0.15, 0.85, 0.2, 1.0)
+	health_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health_bar_fill.z_index = 21
+	health_bar_background.add_child(health_bar_fill)
 
 
 func die() -> void:

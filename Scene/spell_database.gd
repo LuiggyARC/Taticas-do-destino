@@ -3,7 +3,7 @@ extends Node
 var spells := {
 	"Curar Ferimentos Leves": {
 		"level": 1,
-		"classes": ["Clérigo", "Druida", "Bardo", "Paladino", "Ranger"],
+		"classes": ["Clérigo", "Druida", "Bardo"],
 		"description": "Recupera vida dos aliados em uma pequena área.",
 		"effect": "heal",
 		"spell_type": "heal",
@@ -79,7 +79,7 @@ var spells := {
 
 	"Benção": {
 		"level": 1,
-		"classes": ["Clérigo", "Paladino"],
+		"classes": ["Clérigo"],
 		"description": "Concede bônus de ataque ao conjurador temporariamente.",
 		"effect": "buff",
 		"spell_type": "buff",
@@ -112,7 +112,7 @@ var spells := {
 
 	"Enredar": {
 	"level": 1,
-	"classes": ["Druida", "Ranger"],
+	"classes": ["Druida"],
 	"description": "Reduz o movimento dos inimigos em uma área.",
 	"effect": "control",
 	"spell_type": "control",
@@ -255,7 +255,7 @@ var spells := {
 
 	"Benção Maior": {
 		"level": 1,
-		"classes": ["Clérigo", "Paladino"],
+		"classes": ["Clérigo"],
 		"description": "Aumenta a chance de acerto do conjurador temporariamente.",
 		"effect": "buff",
 		"spell_type": "buff",
@@ -272,7 +272,7 @@ var spells := {
 
 	"Escudo da Fé": {
 		"level": 1,
-		"classes": ["Clérigo", "Paladino"],
+		"classes": ["Clérigo"],
 		"description": "Concede proteção divina temporária ao conjurador.",
 		"effect": "buff",
 		"spell_type": "buff",
@@ -304,7 +304,7 @@ var spells := {
 
 	"Luz Sagrada": {
 		"level": 0,
-		"classes": ["Clérigo", "Paladino"],
+		"classes": ["Clérigo"],
 		"description": "Causa pequeno dano sagrado aos inimigos em uma pequena área.",
 		"visual_kind": "light",
 		"effect": "damage",
@@ -337,7 +337,7 @@ var spells := {
 
 	"Cura Menor": {
 		"level": 0,
-		"classes": ["Clérigo", "Druida", "Bardo", "Paladino", "Ranger"],
+		"classes": ["Clérigo", "Druida", "Bardo"],
 		"description": "Recupera uma pequena quantidade de vida dos aliados em uma pequena área.",
 		"effect": "heal",
 		"spell_type": "heal",
@@ -352,7 +352,7 @@ var spells := {
 
 	"Pele de Carvalho": {
 		"level": 2,
-		"classes": ["Druida", "Ranger"],
+		"classes": ["Druida"],
 		"description": "Endurece a pele do conjurador, aumentando sua defesa.",
 		"effect": "buff",
 		"spell_type": "buff",
@@ -385,7 +385,7 @@ var spells := {
 
 	"Espinhos": {
 		"level": 1,
-		"classes": ["Druida", "Ranger"],
+		"classes": ["Druida"],
 		"description": "Cria espinhos no terreno e reduz o movimento dos inimigos na área.",
 		"effect": "control",
 		"spell_type": "control",
@@ -401,40 +401,6 @@ var spells := {
 		"armor_penalty": 0,
 		"movement_penalty": 3.0,
 		"duration": 2
-	},
-
-	"Marca do Caçador": {
-		"level": 1,
-		"classes": ["Ranger"],
-		"description": "Marca o inimigo como presa, aumentando o dano do Ranger.",
-		"effect": "buff",
-		"spell_type": "buff",
-		"type": "buff",
-		"target": "self",
-		"range_meters": 0.0,
-		"area_radius": 0,
-		"attack_bonus": 0,
-		"damage_bonus": 2,
-		"armor_bonus": 0,
-		"movement_bonus": 0.0,
-		"duration": 4
-	},
-
-	"Golpe Divino": {
-		"level": 1,
-		"classes": ["Paladino"],
-		"description": "Fortalece o próximo ataque do Paladino com energia divina.",
-		"effect": "buff",
-		"spell_type": "buff",
-		"type": "buff",
-		"target": "self",
-		"range_meters": 0.0,
-		"area_radius": 0,
-		"attack_bonus": 1,
-		"damage_bonus": 3,
-		"armor_bonus": 0,
-		"movement_bonus": 0.0,
-		"duration": 1
 	},
 
 	"Palavra Curativa": {

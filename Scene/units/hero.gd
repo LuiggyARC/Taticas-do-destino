@@ -1,5 +1,8 @@
 extends Node2D
 
+const LevelProgressionData = preload("res://Scene/level_progression.gd")
+const ClassPowerProgressionData = preload("res://Scene/class_power_progression.gd")
+
 const TILE_SIZE := 64
 
 var is_hidden: bool = false
@@ -9,6 +12,12 @@ var enemy_is_surprised: bool = false
 
 var smite_evil_used: bool = false
 var smite_evil_active: bool = false
+var encounter_powers_used: Array = []
+var druid_guard_active: bool = false
+var cleric_guard_active: bool = false
+var fighter_guard_active: bool = false
+var druid_form_active: bool = false
+var druid_form_end_turn: int = 0
 var is_raging: bool = false
 var rage_used: bool = false
 var rage_uses_this_battle: int = 0
@@ -47,6 +56,7 @@ var damage_reduction: int = 0
 var class_features: Array = []
 var character_name: String = "Herói"
 var character_class: String = ""
+var selected_class_powers: Dictionary = {}
 var character_race: String = "Humano"
 var character_size: String = "Médio"
 var favored_class: String = "Qualquer"
@@ -71,7 +81,7 @@ var feat_extra_opportunity_attacks: int = 0
 var level: int = 1
 var total_xp: int = 0
 var xp_to_next_level: int = 1000
-var max_level: int = 20
+var max_level: int = 30
 
 var strength: int = 10      # FOR
 var dexterity: int = 10     # DES
@@ -123,6 +133,7 @@ var feat_hide_bonus: int = 0
 var feat_sneak_attack_extra_dice: int = 0
 var feat_spell_power_bonus: int = 0
 var feat_spell_damage_bonus: int = 0
+var feat_spell_save_dc_bonus: int = 0
 var feat_healing_bonus: int = 0
 var feat_divine_healing_bonus: int = 0
 var feat_initiative_bonus: int = 0
@@ -142,6 +153,7 @@ var feat_ranged_attack_bonus: int = 0
 var feat_ranged_damage_bonus: int = 0
 var feat_unarmed_damage_bonus: int = 0
 var feat_rage_damage_bonus: int = 0
+var feat_smite_damage_bonus: int = 0
 
 var feat_fortitude_bonus: int = 0
 var feat_reflex_bonus: int = 0
@@ -203,6 +215,9 @@ func update_world_position():
 func reset_movement():
 	if unstoppable_active:
 		unstoppable_turn_started = true
+	druid_guard_active = false
+	cleric_guard_active = false
+	fighter_guard_active = false
 	current_movement_meters = max_movement_meters
 	has_attacked = false
 	has_opportunity_attacked = false
@@ -376,17 +391,7 @@ func calculate_level_from_xp(xp: int) -> int:
 
 
 func get_total_xp_required_for_level(target_level: int) -> int:
-	if target_level <= 1:
-		return 0
-	
-	var total_required := 0
-	var xp_step := 1000.0
-	
-	for level_index in range(2, target_level + 1):
-		total_required += int(round(xp_step))
-		xp_step *= 1.5
-	
-	return total_required
+	return LevelProgressionData.xp_for_level(target_level)
 
 
 func get_xp_progress_in_current_level() -> int:
@@ -446,7 +451,7 @@ func apply_level_up_result(
 		print("Ganho de vida inválido.")
 		return false
 	var attribute_increases: Dictionary = level_up_data.get("attribute_increases", {})
-	var expected_attribute_points: int = (2 + (1 if character_race == "Meio-Elfo" else 0)) if new_level % 4 == 0 else 0
+	var expected_attribute_points: int = LevelProgressionData.attribute_points(new_level, character_race)
 	var allocated_points: int = 0
 	for attribute_key in attribute_increases:
 		if not str(attribute_key) in ["strength", "dexterity", "constitution", "wisdom", "intelligence", "charisma"]:
@@ -457,6 +462,13 @@ func apply_level_up_result(
 		allocated_points += increase
 	if allocated_points != expected_attribute_points:
 		return false
+	var power_options: Array[Dictionary] = ClassPowerProgressionData.get_power_options_for_level(character_class, new_level)
+	var selected_power_id: String = str(level_up_data.get("selected_class_power", ""))
+	if not power_options.is_empty():
+		if selected_power_id.is_empty():
+			selected_power_id = str(power_options[0]["id"])
+		elif selected_power_id != str(power_options[0]["id"]) and selected_power_id != str(power_options[1]["id"]):
+			return false
 	
 	var new_feats: Array = level_up_data.get(
 		"selected_feats",
@@ -480,6 +492,8 @@ func apply_level_up_result(
 	# =====================================================
 	var previous_constitution_modifier: int = get_constitution_modifier()
 	level = new_level
+	if not selected_power_id.is_empty():
+		selected_class_powers[str(new_level)] = selected_power_id
 	for attribute_key in attribute_increases:
 		set(str(attribute_key), int(get(str(attribute_key))) + int(attribute_increases[attribute_key]))
 	
@@ -710,6 +724,11 @@ func apply_level_up_result(
 		max_spell_slots_level_1 += extra_slots
 		spell_slots_level_1 += extra_slots
 	
+	# Personagens antigos podem ter magias e espaços salvos antes da
+	# conversão do Paladino e do Ranger para poderes exclusivos.
+	if not LevelUpManager.new().is_spellcasting_class(character_class):
+		setup_class_spells()
+
 	# =====================================================
 	# PROGRESSÕES DA CLASSE
 	# =====================================================
@@ -893,8 +912,40 @@ func get_armor_class() -> int:
 	
 	if is_raging:
 		armor_class_value -= rage_ac_penalty
+	if character_class == "Druida":
+		if druid_guard_active:
+			armor_class_value += 1 + (1 if selected_feats.has("Casca Espessa") else 0)
+		if druid_form_active:
+			armor_class_value += 1
+	if character_class == "Clérigo" and cleric_guard_active:
+		armor_class_value += 1
+	if character_class == "Guerreiro" and fighter_guard_active:
+		armor_class_value += 2
 	
 	return armor_class_value
+
+
+func activate_druid_form(current_battle_turn: int) -> void:
+	if character_class != "Druida" or druid_form_active:
+		return
+	druid_form_active = true
+	druid_form_end_turn = current_battle_turn + 3
+
+
+func update_druid_form_turn(current_battle_turn: int) -> void:
+	if druid_form_active and current_battle_turn >= druid_form_end_turn:
+		end_druid_form()
+
+
+func end_druid_form() -> void:
+	druid_form_active = false
+	druid_form_end_turn = 0
+
+
+func get_druid_form_damage_bonus() -> int:
+	if character_class != "Druida" or not druid_form_active:
+		return 0
+	return 2 + (1 if selected_feats.has("Garras da Mata") else 0)
 
 func get_touch_armor_class() -> int:
 	return (
@@ -1269,11 +1320,11 @@ func reveal_after_attack():
 
 func activate_smite_evil():
 	if not can_use_smite_evil():
-		print("Destruir o Mal indisponível.")
+		print("Investida Consagrada indisponível.")
 		return
 	
 	smite_evil_active = true
-	print(character_name, " preparou Destruir o Mal!")
+	print(character_name, " preparou Investida Consagrada!")
 
 
 func consume_smite_evil():
@@ -1282,7 +1333,7 @@ func consume_smite_evil():
 	
 	smite_evil_active = false
 	smite_evil_used = true
-	print("Destruir o Mal consumido.")
+	print("Investida Consagrada consumida.")
 
 
 func get_smite_evil_attack_bonus() -> int:
@@ -1302,7 +1353,7 @@ func get_smite_evil_damage_bonus() -> int:
 	if not smite_evil_active:
 		return 0
 	
-	return level
+	return level + feat_smite_damage_bonus
 
 func get_divine_grace_bonus() -> int:
 	if character_class != "Paladino":
@@ -1573,23 +1624,10 @@ func setup_class_spells(
 		known_spells.clear()
 		return
 	
-	var spellcasting_classes: Array[String] = [
-		"Bardo",
-		"Clérigo",
-		"Druida",
-		"Feiticeiro",
-		"Mago",
-		"Paladino",
-		"Ranger"
-	]
-	
-	if not spellcasting_classes.has(
-		character_class
-	):
+	var level_manager := LevelUpManager.new()
+	if not level_manager.is_spellcasting_class(character_class):
 		known_spells.clear()
 		return
-	
-	var level_manager := LevelUpManager.new()
 	
 	var maximum_spell_level: int = (
 		level_manager.get_max_spell_level_for_class(
@@ -1784,12 +1822,14 @@ func apply_feat_bonuses():
 	feat_sneak_attack_extra_dice = 0
 	feat_spell_power_bonus = 0
 	feat_spell_damage_bonus = 0
+	feat_spell_save_dc_bonus = 0
 	feat_healing_bonus = 0
 	feat_divine_healing_bonus = 0
 	feat_initiative_bonus = 0
 	feat_spell_range_bonus = 0.0
 	feat_extra_spell_slot_level_1 = 0
 	feat_extra_rage_uses = 0
+	feat_smite_damage_bonus = 0
 	feat_extra_opportunity_attacks = 0
 	feat_surprise_attack_bonus = 0
 	feat_hidden_damage_bonus = 0
@@ -1871,6 +1911,8 @@ func apply_feat_bonuses():
 			feat_divine_buff_duration_bonus += int(effects["divine_buff_duration_bonus"])
 		if effects.has("holy_damage_bonus"):
 			feat_damage_bonus += int(effects["holy_damage_bonus"])
+		if effects.has("smite_damage_bonus"):
+			feat_smite_damage_bonus += int(effects["smite_damage_bonus"])
 		
 		# =====================================================
 		# RESISTÊNCIAS / PERCEPÇÃO
@@ -1894,7 +1936,7 @@ func apply_feat_bonuses():
 			feat_attack_bonus += int(effects["attack_bonus"])
 		
 		if effects.has("damage_bonus"):
-			if base_feat_name == "Golpe Brutal":
+			if base_feat_name == "Golpe Brutal" or base_feat_name == "Força Implacável":
 				feat_melee_damage_bonus += int(effects["damage_bonus"])
 			else:
 				feat_damage_bonus += int(effects["damage_bonus"])
@@ -1954,6 +1996,8 @@ func apply_feat_bonuses():
 		
 		if effects.has("spell_damage_bonus"):
 			feat_spell_damage_bonus += int(effects["spell_damage_bonus"])
+		if effects.has("spell_save_dc_bonus"):
+			feat_spell_save_dc_bonus += int(effects["spell_save_dc_bonus"])
 		
 		if effects.has("healing_bonus"):
 			feat_healing_bonus += int(effects["healing_bonus"])

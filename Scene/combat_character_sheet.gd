@@ -758,7 +758,7 @@ func build_hero_text(
 	
 	if hero_unit.character_class == "Paladino":
 		sheet_text += (
-			"\nDestruir o Mal: "
+			"\nInvestida Consagrada: "
 			+ smite_status_text
 		)
 	

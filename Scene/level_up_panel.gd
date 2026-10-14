@@ -1,6 +1,9 @@
 extends CanvasLayer
 class_name LevelUpPanel
 
+const ClassPowerProgressionData = preload("res://Scene/class_power_progression.gd")
+const LevelProgressionData = preload("res://Scene/level_progression.gd")
+
 
 signal level_up_confirmed(level_up_data: Dictionary)
 
@@ -26,6 +29,10 @@ var feat_selection_container: VBoxContainer
 var feat_option_buttons: Array[OptionButton] = []
 var feat_detail_buttons: Array[OptionButton] = []
 var attribute_option_buttons: Array[OptionButton] = []
+var power_choice_cards: Dictionary = {}
+var power_choice_buttons: Dictionary = {}
+var power_options: Array[Dictionary] = []
+var selected_power_id: String = ""
 
 var spell_section: VBoxContainer
 var spell_list: ItemList
@@ -231,6 +238,10 @@ func reset_selections() -> void:
 	feat_option_buttons.clear()
 	feat_detail_buttons.clear()
 	attribute_option_buttons.clear()
+	power_choice_cards.clear()
+	power_choice_buttons.clear()
+	power_options.clear()
+	selected_power_id = ""
 	validation_label.text = ""
 
 
@@ -260,6 +271,7 @@ func rebuild_level_up_content() -> void:
 	)
 	
 	create_hp_section()
+	create_level_gains_section()
 	create_progression_section()
 	create_attribute_section()
 	create_feat_section()
@@ -275,6 +287,108 @@ func clear_content_container() -> void:
 	
 	for child in content_container.get_children():
 		child.free()
+
+
+func create_level_gains_section() -> void:
+	var section := create_section_panel("Conquistas deste nível")
+	content_container.add_child(section)
+	var section_content: VBoxContainer = section.get_meta("content")
+	var gains: Array = level_up_preview.get("level_gains", [])
+	var new_level: int = int(level_up_preview.get("new_level", 2))
+	var character_class: String = str(level_up_preview.get("character_class", ""))
+	power_options = ClassPowerProgressionData.get_power_options_for_level(character_class, new_level)
+	for gain in gains:
+		var label := Label.new()
+		label.text = "• " + str(gain)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.add_theme_font_size_override("font_size", 17)
+		section_content.add_child(label)
+	if ClassPowerProgressionData.has_class(character_class):
+		var totals: Dictionary = LevelProgressionData.power_totals_for_level(new_level)
+		var tpc_label := Label.new()
+		tpc_label.text = "Poderes conhecidos (TPC) após evoluir\n%d sem limite / %d encontro / %d diários / %d utilitários" % [totals["at_will"], totals["encounter"], totals["daily"], totals["utility"]]
+		tpc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		tpc_label.add_theme_font_size_override("font_size", 17)
+		tpc_label.add_theme_color_override("font_color", Color(0.73, 0.88, 0.77))
+		section_content.add_child(tpc_label)
+	var xp_label := Label.new()
+	xp_label.text = "XP necessário para este nível: %d" % int(level_up_preview.get("new_xp_threshold", 0))
+	section_content.add_child(xp_label)
+	if not power_options.is_empty():
+		create_power_choice_section(new_level)
+
+
+func create_power_choice_section(new_level: int) -> void:
+	var section := create_section_panel("Escolha seu novo poder")
+	content_container.add_child(section)
+	var section_content: VBoxContainer = section.get_meta("content")
+	var instruction := Label.new()
+	instruction.text = "Nível %d · Selecione uma das duas opções. A escolha ficará registrada no personagem." % new_level
+	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	instruction.add_theme_font_size_override("font_size", 17)
+	section_content.add_child(instruction)
+	var options_row: BoxContainer = VBoxContainer.new() if OS.has_feature("mobile") else HBoxContainer.new()
+	options_row.add_theme_constant_override("separation", 12)
+	section_content.add_child(options_row)
+	for power in power_options:
+		var power_id: String = str(power["id"])
+		var card := PanelContainer.new()
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.add_theme_stylebox_override("panel", create_power_card_style(false))
+		options_row.add_child(card)
+		power_choice_cards[power_id] = card
+		var card_margin := MarginContainer.new()
+		card_margin.add_theme_constant_override("margin_left", 12)
+		card_margin.add_theme_constant_override("margin_right", 12)
+		card_margin.add_theme_constant_override("margin_top", 10)
+		card_margin.add_theme_constant_override("margin_bottom", 10)
+		card.add_child(card_margin)
+		var column := VBoxContainer.new()
+		column.add_theme_constant_override("separation", 8)
+		card_margin.add_child(column)
+		var frequency := Label.new()
+		frequency.text = ("UTILITÁRIO · " if bool(power.get("utility", false)) else "ATAQUE · ") + str(power["frequency"]).to_upper()
+		frequency.add_theme_font_size_override("font_size", 15)
+		frequency.add_theme_color_override("font_color", Color(0.94, 0.75, 0.28))
+		column.add_child(frequency)
+		var power_name := Label.new()
+		power_name.text = str(power["name"])
+		power_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		power_name.add_theme_font_size_override("font_size", 20)
+		column.add_child(power_name)
+		var description := Label.new()
+		description.text = str(power["description"])
+		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		description.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		description.add_theme_font_size_override("font_size", 16)
+		column.add_child(description)
+		var select_button := Button.new()
+		select_button.text = "Escolher este poder"
+		select_button.custom_minimum_size.y = 64 if OS.has_feature("mobile") else 46
+		select_button.add_theme_font_size_override("font_size", 18)
+		select_button.pressed.connect(select_new_power.bind(power_id))
+		column.add_child(select_button)
+		power_choice_buttons[power_id] = select_button
+
+
+func create_power_card_style(selected: bool) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.10, 0.19, 0.15) if selected else Color(0.12, 0.12, 0.15)
+	style.border_color = Color(0.35, 0.88, 0.52) if selected else Color(0.45, 0.37, 0.24)
+	style.set_border_width_all(3 if selected else 2)
+	style.set_corner_radius_all(10)
+	return style
+
+
+func select_new_power(power_id: String) -> void:
+	selected_power_id = power_id
+	for option_id in power_choice_cards:
+		var selected: bool = str(option_id) == power_id
+		var card: PanelContainer = power_choice_cards[option_id]
+		card.add_theme_stylebox_override("panel", create_power_card_style(selected))
+		var button: Button = power_choice_buttons[option_id]
+		button.text = "✓ Poder escolhido" if selected else "Escolher este poder"
+	validation_label.text = ""
 
 func create_attribute_section() -> void:
 	var point_count: int = int(level_up_preview.get("attribute_point_count", 0))
@@ -1036,6 +1150,9 @@ func on_confirm_button_pressed() -> void:
 	if not attribute_option_buttons.is_empty() and attribute_increases.is_empty():
 		validation_label.text = "Distribua todos os pontos de atributo antes de continuar."
 		return
+	if not power_options.is_empty() and selected_power_id.is_empty():
+		validation_label.text = "Escolha um dos novos poderes antes de continuar."
+		return
 	
 	var selected_feats: Array[String] = (
 		get_selected_feats()
@@ -1092,6 +1209,7 @@ func on_confirm_button_pressed() -> void:
 		"hp_die_roll": rolled_hp_die,
 		"hp_gain": calculated_hp_gain,
 		"attribute_increases": attribute_increases,
+		"selected_class_power": selected_power_id,
 		"selected_feats": selected_feats,
 		"selected_spells": selected_spells,
 		"new_base_attack_bonus": int(

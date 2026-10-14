@@ -109,7 +109,9 @@ func update_display(
 	enemy_units: Array,
 	current_enemy: Node2D,
 	hero_unit: Node2D,
-	current_battle_turn: int
+	current_battle_turn: int,
+	allied_units: Array = [],
+	bard_song_rounds_remaining: int = 0
 ) -> void:
 	if not is_instance_valid(panel):
 		return
@@ -138,6 +140,9 @@ func update_display(
 		hero_unit,
 		current_battle_turn
 	)
+	append_allied_druid_effect_lines(lines, allied_units, current_battle_turn)
+	if bard_song_rounds_remaining > 0:
+		lines.append("Grupo: Refrão de Coragem | +1 para acertar armas | %d rodada(s)" % bard_song_rounds_remaining)
 	
 	if lines.size() <= 1:
 		lines.append("Nenhum")
@@ -270,6 +275,14 @@ func append_hero_effect_lines(
 		return
 	if "unstoppable_active" in hero_unit and bool(hero_unit.unstoppable_active):
 		lines.append("Herói: Imparável | +1 resistências, +2 dano até o fim do próximo turno")
+	if "druid_guard_active" in hero_unit and bool(hero_unit.druid_guard_active):
+		lines.append("Herói: Casca Viva | até o próximo turno")
+	if "cleric_guard_active" in hero_unit and bool(hero_unit.cleric_guard_active):
+		lines.append("Herói: Luz Vigilante | +1 CA até o próximo turno")
+	if "fighter_guard_active" in hero_unit and bool(hero_unit.fighter_guard_active):
+		lines.append("Herói: Postura Firme | +2 CA até o próximo turno")
+	if "druid_form_active" in hero_unit and bool(hero_unit.druid_form_active):
+		lines.append("Herói: Aspecto Selvagem | %dt" % maxi(0, int(hero_unit.druid_form_end_turn) - current_battle_turn))
 	if "status_effects" in hero_unit:
 		var status_data: Dictionary = hero_unit.status_effects
 		for effect_name in status_data.keys():
@@ -321,6 +334,22 @@ func append_hero_effect_lines(
 				+ str(buff_turns_remaining)
 				+ "t"
 			)
+
+
+func append_allied_druid_effect_lines(lines: Array[String], allied_units: Array, current_battle_turn: int) -> void:
+	for ally in allied_units:
+		if not is_instance_valid(ally) or str(ally.faction) != "ally":
+			continue
+		if str(ally.character_class) == "Clérigo" and ally.cleric_guard_active:
+			lines.append("%s: Luz Vigilante | +1 CA até o próximo turno" % str(ally.display_name))
+		if str(ally.character_class) == "Guerreiro" and ally.fighter_guard_active:
+			lines.append("%s: Postura Firme | +2 CA até o próximo turno" % str(ally.display_name))
+		if str(ally.character_class) != "Druida":
+			continue
+		if ally.druid_guard_active:
+			lines.append("%s: Casca Viva | até o próximo turno" % str(ally.display_name))
+		if ally.druid_form_active:
+			lines.append("%s: Aspecto Selvagem | %dt" % [str(ally.display_name), maxi(0, int(ally.druid_form_end_turn) - current_battle_turn)])
 
 
 func get_effect_display_name(

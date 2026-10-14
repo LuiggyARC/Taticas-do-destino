@@ -1,11 +1,23 @@
 extends Control
 const CHARACTER_CREATION_BACKGROUND_PATH := "res://Assets/UI/CharacterCreation/character_creation_background.jpg"
+const ATTRIBUTE_KEYS: Array[String] = ["strength", "dexterity", "constitution", "wisdom", "intelligence", "charisma"]
+const CLASS_PRIMARY_ATTRIBUTES := {
+	"Bárbaro": "strength",
+	"Bardo": "charisma",
+	"Bruxo": "charisma",
+	"Clérigo": "wisdom",
+	"Druida": "wisdom",
+	"Feiticeiro": "charisma",
+	"Guerreiro": "constitution",
+	"Ladino": "dexterity",
+	"Mago": "intelligence",
+	"Monge": "dexterity",
+	"Paladino": "strength",
+	"Ranger": "dexterity"
+}
 
 var main_creation_panel: PanelContainer
 var stats_panel: PanelContainer
-
-var attribute_points_total: int = 10
-var attribute_points_remaining: int = 10
 
 var feat_title_label: Label
 var feat_selection_container: BoxContainer
@@ -23,8 +35,8 @@ var portrait_section_container: VBoxContainer
 var portrait_placeholder_label: Label
 
 var attribute_row_labels: Dictionary = {}
-var points_label: Label
-var points_progress: ProgressBar
+var attribute_help_label: Label
+var attribute_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 var name_input: LineEdit
 var race_option: OptionButton
@@ -185,6 +197,26 @@ var race_presets := {
 	}
 }
 var class_presets := {
+	"Bruxo": {
+		"hit_die": 8,
+		"fixed_hp_per_level": 5,
+		"base_attack_bonus_type": "medio",
+		"fortitude_type": "ruim",
+		"reflex_type": "ruim",
+		"will_type": "bom",
+		"reflex_extra_bonus": 0,
+		"movement_bonus": 0.0,
+		"attack": 16,
+		"spell_attribute": "charisma",
+		"description": "Conjurador de pactos que ataca à distância com poder mágico próprio. Suas habilidades são sem limite, por encontro e diárias; não gastam espaços de magia.",
+		"features": [
+			"Dado de Vida d8; vida fixa +5 por nível, mais Constituição",
+			"Vontade forte; pactos baseados em Carisma",
+			"Centelha do Pacto: ataque mágico a até 9 m (sem limite)",
+			"Pulso Vinculante: ataque mágico reforçado (por encontro)",
+			"Julgamento do Pacto: ataque mágico poderoso (diário)"
+		]
+	},
 	"Bárbaro": {
 		"hit_die": 12,
 		"fixed_hp_per_level": 8,
@@ -195,9 +227,10 @@ var class_presets := {
 		"reflex_extra_bonus": 2,
 		"movement_bonus": 3.0,
 		"attack": 20,
-		"description": "Guerreiros implacáveis que usam a fúria em combate. Excelentes em dano corpo a corpo e sobrevivência.",
+		"description": "Guerreiros implacáveis que alternam técnicas sem limite, por encontro e diárias. Excelentes em dano corpo a corpo e sobrevivência.",
 		"features": [
-			"Fúria: aumenta Força, Constituição e Vontade, mas reduz a CA",
+			"Habilidades: Golpe Impetuoso (sem limite), Fúria (por encontro) e Golpe Decisivo (diário)",
+			"Fúria: aumenta Força e Constituição, mas reduz a CA",
 			"+3m de deslocamento",
 			"+2 em Reflexos",
 			"Redução de Dano 5 no nível 10",
@@ -205,8 +238,8 @@ var class_presets := {
 		]
 	},
 		"Bardo": {
-		"hit_die": 6,
-		"fixed_hp_per_level": 4,
+		"hit_die": 8,
+		"fixed_hp_per_level": 5,
 		"base_attack_bonus_type": "medio",
 		"fortitude_type": "ruim",
 		"reflex_type": "bom",
@@ -215,12 +248,12 @@ var class_presets := {
 		"movement_bonus": 0.0,
 		"attack": 16,
 		"spell_attribute": "charisma",
-		"description": "Suporte versátil, usuário de magia arcana espontânea e especialista em perícias variadas.",
+		"description": "Artista versátil que usa magias por círculo e usos diários para apoiar o grupo. Mantém Inspirar Coragem como característica de classe.",
 		"features": [
-			"Música Bárdica: +2 para acerto de magias contra testes de resistência",
-			"Conhecimento Bárdico: sabe um pouco sobre quase tudo",
-			"Conjuração arcana espontânea baseada em Carisma",
-			"Boa quantidade de perícias"
+			"Dado de Vida d8; vida fixa +5 por nível, mais Constituição",
+			"Magias arcanas espontâneas baseadas em Carisma; Inspirar Coragem permanece disponível",
+			"Magias conhecidas com usos diários por círculo",
+			"Inspirar Coragem: apoio musical ao grupo"
 		]
 	},
 	"Clérigo": {
@@ -234,12 +267,12 @@ var class_presets := {
 		"movement_bonus": 0.0,
 		"attack": 18,
 		"spell_attribute": "wisdom",
-		"description": "Conjurador divino resistente, focado em cura, suporte e combate durável.",
+		"description": "Conjurador divino resistente. Usa magias de cura e proteção por círculo e usos diários para proteger o grupo.",
 		"features": [
-			"Conjuração divina baseada em Sabedoria",
-			"Cura e suporte divino",
-			"Expulsar ou Fascinar Mortos-Vivos",
-			"Magias adicionais baseadas na divindade"
+			"Dado de Vida d8; vida fixa +5 por nível, mais Constituição",
+			"Conjuração divina baseada em Sabedoria; magias existentes preservadas",
+			"Magias de cura e proteção com usos diários por círculo",
+			"Aprende automaticamente as magias disponíveis para seu nível"
 		]
 	},
 		"Druida": {
@@ -253,17 +286,17 @@ var class_presets := {
 		"movement_bonus": 0.0,
 		"attack": 18,
 		"spell_attribute": "wisdom",
-		"description": "Conjurador divino ligado à natureza, especializado em controle de terreno, suporte natural e transformação.",
+		"description": "Guardião da natureza com magias por círculo e usos diários, além de um companheiro animal.",
 		"features": [
 			"Magia divina focada na natureza baseada em Sabedoria",
 			"Companheiro Animal",
-			"Forma Selvagem: transformação em animais ou elementais",
+			"Magias de natureza com usos diários por círculo",
 			"Controle de terreno e suporte natural"
 		]
 	},
 	"Feiticeiro": {
-		"hit_die": 4,
-		"fixed_hp_per_level": 3,
+		"hit_die": 8,
+		"fixed_hp_per_level": 5,
 		"base_attack_bonus_type": "baixo",
 		"fortitude_type": "ruim",
 		"reflex_type": "ruim",
@@ -272,13 +305,14 @@ var class_presets := {
 		"movement_bonus": 0.0,
 		"attack": 14,
 		"spell_attribute": "charisma",
-		"description": "Conjurador arcano espontâneo, focado em poder mágico bruto. Suas magias de dano causam +1 de dano por círculo: +1 no 1º, +2 no 2º, +3 no 3º e assim por diante.",
+		"description": "Conjurador arcano espontâneo de vida moderada e Vontade forte. Suas magias de dano causam +1 por círculo: +1 no 1º, +2 no 2º e assim por diante.",
 		"features": [
+			"Dado de Vida d8; vida fixa +5 por nível, mais Constituição",
+			"Vontade forte; ataque com armas baixo",
 			"Conjuração arcana espontânea baseada em Carisma",
 			"Poder da Linhagem: +1 de dano por círculo em magias ofensivas (magias de círculo 0 não recebem bônus)",
 			"Conhece poucas magias, mas pode conjurá-las muitas vezes",
-			"Não precisa preparar magias com antecedência",
-			"Familiar: pet mágico"
+			"Não precisa preparar magias com antecedência"
 		]
 	},
 		"Guerreiro": {
@@ -292,20 +326,19 @@ var class_presets := {
 		"movement_bonus": 0.0,
 		"attack": 20,
 		"spell_attribute": "none",
-		"description": "Combatente versátil, treinado em armas, armaduras e táticas militares.",
+		"description": "Combatente versátil de linha de frente. Usa técnicas sem limite, por encontro e diárias para alternar precisão, proteção e impacto.",
 		"features": [
-			"Dado de Vida d10",
-			"BBA alto",
-			"Fortitude boa",
-			"Usa todas as armas e táticas militares",
-			"Talento adicional no 1º nível",
-			"Talento adicional no 2º nível",
-			"Talento adicional a cada dois níveis subsequentes: 4º, 6º, 8º..."
+			"Dado de Vida d10; vida fixa +6 por nível, mais Constituição",
+			"Ataque com armas alto; Fortitude forte",
+			"Golpe Técnico: +1 para acertar com arma (sem limite)",
+			"Postura Firme: +2 na defesa até o próximo turno (por encontro)",
+			"Ruptura de Linha: +2 para acertar e +3 de dano (diário)",
+			"Um talento adicional na criação e na progressão da classe"
 		]
 	},
 	"Ladino": {
-		"hit_die": 6,
-		"fixed_hp_per_level": 4,
+		"hit_die": 8,
+		"fixed_hp_per_level": 5,
 		"base_attack_bonus_type": "medio",
 		"fortitude_type": "ruim",
 		"reflex_type": "bom",
@@ -314,21 +347,19 @@ var class_presets := {
 		"movement_bonus": 0.0,
 		"attack": 16,
 		"spell_attribute": "none",
-		"description": "Especialista em furtividade, perícias e dano preciso contra pontos fracos.",
+		"description": "Combatente ágil que cria aberturas para golpes precisos. Usa técnicas sem limite, por encontro e diárias; mantém Esconder-se e Ataque Furtivo.",
 		"features": [
-			"Dado de Vida d6",
-			"BBA médio",
-			"Reflexos bons",
-			"Ataque Furtivo: dano extra contra inimigos flanqueados ou em desvantagem",
-			"Encontrar Armadilhas",
-			"Evasão: não sofre dano se passar em testes de Reflexos contra certos efeitos",
-			"Esquiva Sobrenatural",
-			"Maior quantidade de pontos de perícia do jogo"
+			"Dado de Vida d8; vida fixa +5 por nível, mais Constituição",
+			"Ataque com armas médio; Reflexos fortes",
+			"Ataque Furtivo: dano extra contra inimigos flanqueados ou surpreendidos",
+			"Passo Oculto: esconder-se uma vez por turno antes de atacar (sem limite)",
+			"Brecha Calculada: +2 para acertar com arma (uma vez por encontro)",
+			"Corte Decisivo: +4 de dano com arma (uma vez por dia)"
 		]
 	},
 	"Mago": {
-		"hit_die": 4,
-		"fixed_hp_per_level": 3,
+		"hit_die": 6,
+		"fixed_hp_per_level": 4,
 		"base_attack_bonus_type": "baixo",
 		"fortitude_type": "ruim",
 		"reflex_type": "ruim",
@@ -337,17 +368,15 @@ var class_presets := {
 		"movement_bonus": 0.0,
 		"attack": 12,
 		"spell_attribute": "intelligence",
-		"description": "Especialista em magia arcana preparada, controle e utilidade. Recebe +1 uso por dia em cada círculo de magia disponível do 1º ao 4º.",
+		"description": "Especialista em magia arcana baseada em Inteligência, controle e utilidade. Tem vida baixa, Vontade forte e +1 uso por dia em cada círculo de magia disponível do 1º ao 4º.",
 		"features": [
-			"Dado de Vida d4",
+			"Dado de Vida d6; vida fixa +4 por nível, mais Constituição",
 			"BBA baixo",
 			"Vontade boa",
-			"Conjuração arcana preparatória baseada em Inteligência",
+			"Conjuração arcana baseada em Inteligência",
 			"Estudo Arcano: +1 uso de magia por dia em cada círculo disponível do 1º ao 4º",
-			"Precisa estudar grimórios e preparar magias diariamente",
-			"Pode aprender uma quantidade muito grande de magias",
-			"Talento de metamágica +1 no início",
-			"Familiar: pet mágico"
+			"Seleciona as magias conhecidas na criação e ao subir de nível",
+			"Pode aprender mais magias que o feiticeiro"
 		]
 	},
 	"Monge": {
@@ -361,15 +390,14 @@ var class_presets := {
 		"movement_bonus": 3.0,
 		"attack": 18,
 		"spell_attribute": "none",
-		"description": "Combatente desarmado móvel, com defesas místicas e ótimo desempenho em resistências.",
+		"description": "Combatente desarmado móvel, com resistências fortes. Alterna técnicas sem limite, por encontro e diárias.",
 		"features": [
-			"Dado de Vida d8",
-			"BBA médio",
-			"Fortitude boa",
-			"Reflexos bons",
-			"Vontade boa",
+			"Dado de Vida d8; vida fixa +6 por nível, mais Constituição",
+			"Fortitude, Reflexos e Vontade fortes",
 			"Dano desarmado progressivo",
-			"Rajada de Golpes: ataques extras com penalidade",
+			"Golpe Concentrado: +1 para acertar (sem limite)",
+			"Rajada de Golpes: dois golpes (por encontro)",
+			"Força Interior: +4 de dano (diário)",
 			"Bônus de Sabedoria na CA",
 			"Evasão",
 			"Imunidades progressivas contra doenças e venenos",
@@ -386,19 +414,20 @@ var class_presets := {
 		"reflex_extra_bonus": 0,
 		"movement_bonus": 0.0,
 		"attack": 20,
-		"spell_attribute": "wisdom",
+		"spell_attribute": "none",
 		"alignment_restriction": "Leal e Bom",
-		"description": "Cavaleiro sagrado, focado em liderança, defesa contra o mal, cura e combate resistente.",
+		"description": "Defensor juramentado que alterna técnicas sem limite, por encontro e diárias. Resiste na linha de frente e protege o grupo.",
 		"features": [
 			"Dado de Vida d10",
 			"BBA alto",
 			"Fortitude boa",
 			"Restrito à tendência Leal e Bom",
-			"Destruir o Mal: soma Carisma no ataque e nível no dano",
+			"Habilidades: Golpe Vigilante (sem limite), Investida Consagrada (por encontro) e Veredito Radiante (diário)",
+			"Investida Consagrada: soma Carisma no ataque e nível no dano",
 			"Cura pelas Mãos",
 			"Graça Divina: soma bônus de Carisma em todos os testes de resistência",
 			"Montaria Especial no nível 5",
-			"Pequeno número de magias divinas nos níveis mais altos"
+			"Não usa magias; usa apenas poderes sem limite, por encontro e diários"
 		]
 	},
 	"Ranger": {
@@ -411,22 +440,22 @@ var class_presets := {
 		"reflex_extra_bonus": 0,
 		"movement_bonus": 0.0,
 		"attack": 18,
-		"spell_attribute": "wisdom",
-		"description": "Sobrevivente, rastreador e combatente especializado em arquearia ou combate com duas armas.",
+		"spell_attribute": "none",
+		"description": "Rastreador ágil que luta à distância ou de perto. Usa poderes sem limite, por encontro e diários; recebe companheiro animal no nível 4, sem magias.",
 		"features": [
-			"Dado de Vida d8",
-			"BBA alto",
-			"Fortitude boa",
-			"Reflexos bons",
-			"Inimigo Predileto: bônus contra tipos específicos de criaturas",
-			"Estilos de Combate gratuitos nos níveis 2, 6 e 11",
-			"Companheiro Animal",
-			"Conjuração de magias divinas limitadas em níveis mais altos"
+			"Dado de Vida d8; vida fixa +5 por nível, mais Constituição",
+			"Ataque com armas alto; Fortitude e Reflexos fortes",
+			"Mira de Campo: +1 para acertar com arma (sem limite)",
+			"Passo da Trilha: +3 m de movimento no turno (por encontro)",
+			"Caçada Implacável: +4 de dano com arma (diário)",
+			"Companheiro Animal a partir do nível 4",
+			"Não usa magias; usa apenas poderes de classe"
 		]
 	},
 }
 func _ready():
 	GameState.player_portrait_path = ""
+	roll_initial_attributes_for_class(selected_class)
 	
 	create_ui()
 	create_portrait_selection()
@@ -918,7 +947,7 @@ func create_ui():
 	race_option.item_selected.connect(on_race_selected)
 	content.add_child(race_option)
 	
-	# Bônus racial independente dos 10 pontos distribuíveis.
+	# O bônus racial é aplicado depois do sorteio dos atributos.
 	human_bonus_label = Label.new()
 	human_bonus_label.add_theme_font_size_override("font_size", 18)
 	content.add_child(human_bonus_label)
@@ -1337,16 +1366,17 @@ func toggle_advanced_stats() -> void:
 func update_class_strengths() -> void:
 	var profiles := {
 		"Bárbaro": ["Dano físico: muito alto", "Vida: muito alta", "Magia: não usa"],
+		"Bruxo": ["Dano físico: baixo", "Vida: moderada", "Magia: pactos ofensivos"],
 		"Bardo": ["Dano físico: moderado", "Vida: moderada", "Magia: versátil"],
 		"Clérigo": ["Dano físico: moderado", "Vida: alta", "Magia: cura e proteção"],
 		"Druida": ["Dano físico: moderado", "Vida: moderada", "Magia: natureza"],
-		"Feiticeiro": ["Dano físico: baixo", "Vida: baixa", "Magia: muito forte"],
+		"Feiticeiro": ["Dano físico: baixo", "Vida: média", "Magia: muito forte"],
 		"Guerreiro": ["Dano físico: muito alto", "Vida: alta", "Magia: não usa"],
 		"Ladino": ["Dano físico: preciso", "Vida: moderada", "Magia: não usa"],
 		"Mago": ["Dano físico: baixo", "Vida: baixa", "Magia: muito forte"],
 		"Monge": ["Dano físico: alto", "Vida: moderada", "Magia: não usa"],
-		"Paladino": ["Dano físico: alto", "Vida: alta", "Magia: cura e proteção"],
-		"Ranger": ["Dano físico: alto", "Vida: moderada", "Magia: natureza"]
+		"Paladino": ["Dano físico: alto", "Vida: alta", "Magia: não usa; poderes de proteção"],
+		"Ranger": ["Dano físico: alto", "Vida: moderada", "Magia: não usa; poderes de combate"]
 	}
 	var profile: Array = profiles.get(selected_class, ["Dano físico: variável", "Vida: variável", "Magia: variável"])
 	var keys := ["damage", "survival", "magic"]
@@ -1581,7 +1611,7 @@ func update_stats_preview():
 	class_summary_label.text = "Sua Classe: " + selected_class + "\n" + str(class_preset["description"])
 	class_description_label.text = str(class_preset["description"])
 	var racial_rules: String = (
-		"Bônus inicial: +%d em %s, além dos 10 pontos distribuíveis.\n" % [int(race_preset["bonus_amount"]), selected_racial_bonus]
+		"Bônus racial: +%d em %s, aplicado após o sorteio dos atributos.\n" % [int(race_preset["bonus_amount"]), selected_racial_bonus]
 		+ race_highlight + "\n" + get_race_progression_text(selected_race)
 	)
 	race_details_label.text = racial_rules
@@ -1639,17 +1669,10 @@ func update_final_review() -> void:
 		+ "Talentos: %s\n" % feats_summary
 		+ "Raça: %s" % get_race_progression_text(selected_race)
 	)
-	if attribute_points_remaining > 0:
-		final_review_label.text += "\nFaltam %d pontos de atributo para distribuir." % attribute_points_remaining
 	if has_duplicate_feats():
 		final_review_label.text += "\nEscolha talentos diferentes antes de criar o personagem."
 	
 func confirm_character():
-	if attribute_points_remaining > 0:
-		print("Você ainda precisa distribuir todos os pontos de atributo.")
-		print("Pontos restantes: ", attribute_points_remaining)
-		return
-	
 	if has_method("has_duplicate_feats"):
 		if bool(call("has_duplicate_feats")):
 			print("Você não pode escolher o mesmo talento mais de uma vez.")
@@ -1780,7 +1803,8 @@ func confirm_character():
 	GameState.hero_level = 1
 	GameState.hero_total_xp = 0
 	GameState.hero_xp_to_next_level = 1000
-	GameState.hero_max_level = 20
+	GameState.hero_max_level = 30
+	GameState.hero_class_power_choices = {}
 	
 	GameState.hero_max_hp = starting_hp
 	GameState.hero_attack_power = int(class_preset["attack"])
@@ -1842,7 +1866,10 @@ func on_class_selected(index: int):
 	UIAudioManager.play_select()
 
 	if class_option != null:
-		selected_class = class_option.get_item_text(index)
+		var new_class: String = class_option.get_item_text(index)
+		if new_class != selected_class:
+			selected_class = new_class
+			roll_initial_attributes_for_class(selected_class)
 
 	has_rolled_hp = false
 	rolled_hp_value = 0
@@ -1850,6 +1877,7 @@ func on_class_selected(index: int):
 	update_hp_progression_options()
 	update_companion_visibility()
 	refresh_feat_selection()
+	update_attribute_labels()
 	update_stats_preview()
 	
 
@@ -1968,30 +1996,11 @@ func create_attributes_section(parent: VBoxContainer):
 	attributes_title.add_theme_font_size_override("font_size", 20)
 	attributes_box.add_child(attributes_title)
 	
-	var points_header := HBoxContainer.new()
-	points_header.add_theme_constant_override("separation", 16)
-	attributes_box.add_child(points_header)
-	points_label = Label.new()
-	points_label.custom_minimum_size.y = 30
-	points_header.add_child(points_label)
-	points_progress = ProgressBar.new()
-	points_progress.custom_minimum_size = Vector2(160, 24)
-	points_progress.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	points_progress.min_value = 0
-	points_progress.max_value = attribute_points_total
-	points_progress.show_percentage = false
-	var points_fill := StyleBoxFlat.new()
-	points_fill.bg_color = Color(0.20, 0.76, 0.43)
-	points_fill.set_corner_radius_all(6)
-	points_progress.add_theme_stylebox_override("fill", points_fill)
-	points_header.add_child(points_progress)
-	
-	var help_label := Label.new()
-	help_label.text = "Valor distribuído  +  bônus racial  →  valor final salvo"
-	help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	help_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	help_label.add_theme_font_size_override("font_size", 13)
-	attributes_box.add_child(help_label)
+	attribute_help_label = Label.new()
+	attribute_help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	attribute_help_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	attribute_help_label.add_theme_font_size_override("font_size", 15)
+	attributes_box.add_child(attribute_help_label)
 	
 	var grid := GridContainer.new()
 	grid.columns = 1
@@ -2043,30 +2052,19 @@ func create_attribute_row(parent: GridContainer, attribute_name: String, attribu
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_label.custom_minimum_size.x = 50
 	row.add_child(name_label)
-	var minus_button := Button.new()
-	minus_button.text = "−"
-	minus_button.custom_minimum_size = Vector2(44, 48)
-	minus_button.add_theme_font_size_override("font_size", 24)
-	row.add_child(minus_button)
 	var base_label := Label.new()
 	base_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	base_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	base_label.custom_minimum_size.x = 48
-	base_label.tooltip_text = "Valor escolhido com os 10 pontos distribuíveis."
+	base_label.tooltip_text = "Valor inicial sorteado para a classe."
 	row.add_child(base_label)
-	
-	var plus_button := Button.new()
-	plus_button.text = "+"
-	plus_button.custom_minimum_size = Vector2(44, 48)
-	plus_button.add_theme_font_size_override("font_size", 24)
-	row.add_child(plus_button)
 	var divider := VSeparator.new()
 	row.add_child(divider)
 	var racial_label := Label.new()
 	racial_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	racial_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	racial_label.custom_minimum_size.x = 90
-	racial_label.tooltip_text = "Bônus escolhido para a raça; não consome os 10 pontos."
+	racial_label.tooltip_text = "Bônus escolhido para a raça, aplicado após o sorteio."
 	racial_label.add_theme_color_override("font_color", Color(0.97, 0.78, 0.43))
 	row.add_child(racial_label)
 	var result_arrow := Label.new()
@@ -2083,49 +2081,31 @@ func create_attribute_row(parent: GridContainer, attribute_name: String, attribu
 	row.add_child(final_label)
 	attribute_row_labels[attribute_key] = {"base": base_label, "racial": racial_label, "final": final_label}
 	
-	minus_button.pressed.connect(func(): decrease_attribute(attribute_key))
-	plus_button.pressed.connect(func(): increase_attribute(attribute_key))
-	
-func increase_attribute(attribute_key: String):
-	if attribute_points_remaining <= 0:
-		UIAudioManager.play_error()
-		print("Sem pontos disponíveis.")
-		return
-	
-	var current_value: int = get_base_attribute_value(attribute_key)
-	
-	if current_value >= 18:
-		UIAudioManager.play_error()
-		print("Atributo já está no máximo.")
-		return
-	
-	UIAudioManager.play_click()
-	
-	set_base_attribute_value(attribute_key, current_value + 1)
-	attribute_points_remaining -= 1
-	
+func roll_initial_attributes_for_class(character_class: String) -> void:
+	var primary_attribute: String = str(CLASS_PRIMARY_ATTRIBUTES.get(character_class, "strength"))
+	# Os cinco valores somam 60: todos começam com o mesmo total de atributos,
+	# mas cada valor secundário pode variar livremente entre 8 e 16.
+	var secondary_scores: Array[int] = [8, 10, 12, 14, 16]
+	attribute_rng.randomize()
+	for _roll in range(40):
+		var source_index: int = attribute_rng.randi_range(0, secondary_scores.size() - 1)
+		var target_index: int = attribute_rng.randi_range(0, secondary_scores.size() - 1)
+		if source_index != target_index and secondary_scores[source_index] > 8 and secondary_scores[target_index] < 16:
+			secondary_scores[source_index] -= 1
+			secondary_scores[target_index] += 1
+	for index in range(secondary_scores.size() - 1, 0, -1):
+		var chosen_index: int = attribute_rng.randi_range(0, index)
+		var previous_value: int = secondary_scores[index]
+		secondary_scores[index] = secondary_scores[chosen_index]
+		secondary_scores[chosen_index] = previous_value
+	var secondary_index: int = 0
+	for attribute_key in ATTRIBUTE_KEYS:
+		var rolled_value: int = 18
+		if attribute_key != primary_attribute:
+			rolled_value = secondary_scores[secondary_index]
+			secondary_index += 1
+		set_base_attribute_value(attribute_key, rolled_value)
 	update_attribute_labels()
-	update_stats_preview()
-	refresh_feat_selection()
-	update_stats_preview()
-
-func decrease_attribute(attribute_key: String):
-	var current_value: int = get_base_attribute_value(attribute_key)
-	
-	if current_value <= 8:
-		UIAudioManager.play_error()
-		print("Atributo já está no mínimo.")
-		return
-	
-	UIAudioManager.play_click()
-	
-	set_base_attribute_value(attribute_key, current_value - 1)
-	attribute_points_remaining += 1
-	
-	update_attribute_labels()
-	update_stats_preview()
-	refresh_feat_selection()
-	update_stats_preview()
 
 func get_base_attribute_value(attribute_key: String) -> int:
 	if attribute_key == "strength":
@@ -2160,10 +2140,10 @@ func set_base_attribute_value(attribute_key: String, value: int):
 
 
 func update_attribute_labels():
-	if points_label != null:
-		points_label.text = "PONTOS RESTANTES: " + str(attribute_points_remaining) + " / " + str(attribute_points_total)
-	if points_progress != null:
-		points_progress.value = attribute_points_remaining
+	if attribute_help_label != null:
+		var primary_key: String = str(CLASS_PRIMARY_ATTRIBUTES.get(selected_class, "strength"))
+		var primary_labels := {"strength": "FOR", "dexterity": "DES", "constitution": "CON", "wisdom": "SAB", "intelligence": "INT", "charisma": "CAR"}
+		attribute_help_label.text = "%s começa com 18 · outros atributos sorteados entre 8 e 16 · bônus racial aplicado ao final" % str(primary_labels.get(primary_key, "FOR"))
 	
 	for attribute_key in attribute_row_labels:
 		var labels: Dictionary = attribute_row_labels[attribute_key]
@@ -2213,7 +2193,7 @@ func update_racial_bonus_options() -> void:
 		return
 	var race_preset: Dictionary = race_presets[selected_race]
 	var options: Array = race_preset["bonus_options"]
-	human_bonus_label.text = "Bônus de %s (+%d) — além dos 10 pontos" % [selected_race, int(race_preset["bonus_amount"])]
+	human_bonus_label.text = "Bônus racial de %s (+%d)" % [selected_race, int(race_preset["bonus_amount"])]
 	human_bonus_option.clear()
 	for attribute_name in options:
 		human_bonus_option.add_item(str(attribute_name))

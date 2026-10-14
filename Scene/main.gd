@@ -68,6 +68,19 @@ const LevelUpPanelScript := preload(
 const StoryChoicePanelScript := preload(
 	"res://Scene/story_choice_panel.gd"
 )
+const BarbarianPowers := preload("res://Scene/barbarian_powers.gd")
+const PaladinPowers := preload("res://Scene/paladin_powers.gd")
+const DruidPowers := preload("res://Scene/druid_powers.gd")
+const RoguePowers := preload("res://Scene/rogue_powers.gd")
+const RangerPowers := preload("res://Scene/ranger_powers.gd")
+const ClericPowers := preload("res://Scene/cleric_powers.gd")
+const BardPowers := preload("res://Scene/bard_powers.gd")
+const FighterPowers := preload("res://Scene/fighter_powers.gd")
+const MonkPowers := preload("res://Scene/monk_powers.gd")
+const WarlockPowers := preload("res://Scene/warlock_powers.gd")
+const ClassPowerProgressionData := preload("res://Scene/class_power_progression.gd")
+const LevelProgressionData := preload("res://Scene/level_progression.gd")
+const CharacterCreationScript := preload("res://Scene/character_creation.gd")
 const ANIRI_THEME_PATH := (
 	"res://Assets/Audio/Aniritema.mp3"
 )
@@ -126,6 +139,7 @@ var level_up_panel: Node
 var initiative_order: Array[Node2D] = []
 var current_initiative_index: int = 0
 var current_active_unit: Node2D
+var bard_song_end_round: int = 0
 
 var attack_roll_box: Control
 var battle_finished: bool = false
@@ -146,6 +160,7 @@ var rogue_was_spotted: bool = false
 var rogue_hide_check_done: bool = false
 var prepared_class_attack: String = ""
 var prepared_class_attacker: Node2D
+var class_ability_popup: PopupPanel
 var turn_status_controller: Node
 
 var current_stage: int = 1
@@ -541,9 +556,10 @@ func load_progress():
 	GameState.hero_max_level = int(
 		loaded_player_presets.get(
 			"hero_max_level",
-			20
+			30
 		)
 	)
+	GameState.hero_max_level = maxi(30, GameState.hero_max_level)
 	
 	GameState.hero_max_hp = int(
 		loaded_player_presets.get(
@@ -1035,8 +1051,11 @@ func show_stage_one_guided_tip(title: String, body: String, target: String, butt
 		return false
 	if battle_tutorial_controller.visible:
 		return false
+	var steps: Array[Dictionary] = [
+		{"title": title, "text": body, "target": target, "button_text": button_text, "progress_text": "TUTORIAL PRÁTICO"}
+	]
 	battle_tutorial_controller.start_tutorial(
-		[{"title": title, "text": body, "target": target, "button_text": button_text, "progress_text": "TUTORIAL PRÁTICO"}],
+		steps,
 		Callable(self, "get_tutorial_target_rect")
 	)
 	var completed: bool = await battle_tutorial_controller.closed
@@ -1464,6 +1483,27 @@ func hero_attack() -> void:
 	
 	if not is_instance_valid(enemy):
 		return
+	var barbarian_power_bonus: int = get_prepared_barbarian_damage_bonus(hero)
+	if barbarian_power_bonus > 0 and not consume_prepared_barbarian_power(hero):
+		clear_prepared_class_attack()
+		return
+	var paladin_power_prepared: bool = is_prepared_paladin_power(hero)
+	if paladin_power_prepared and not consume_prepared_paladin_power(hero):
+		clear_prepared_class_attack()
+		return
+	var rogue_power_prepared: bool = is_prepared_rogue_power(hero)
+	if rogue_power_prepared and not consume_prepared_rogue_power(hero):
+		clear_prepared_class_attack()
+		return
+	var ranger_power_prepared: bool = is_prepared_ranger_power(hero)
+	if ranger_power_prepared and not consume_prepared_ranger_power(hero):
+		clear_prepared_class_attack()
+		return
+	var bard_power_prepared: bool = is_prepared_bard_power(hero)
+	var fighter_power_prepared: bool = is_prepared_fighter_power(hero)
+	if fighter_power_prepared and not consume_prepared_fighter_power(hero):
+		clear_prepared_class_attack()
+		return
 
 	if hero.character_class == "Ladino" and hero.is_hidden:
 		check_hidden_rogue_perception(hero)
@@ -1566,6 +1606,8 @@ func hero_attack() -> void:
 		damage_bonus += int(
 			hero.feat_melee_damage_bonus
 		)
+		if hero.character_class == "Druida":
+			damage_bonus += hero.get_druid_form_damage_bonus()
 	
 	if weapon_type == "ranged":
 		attack_bonus += int(
@@ -1594,6 +1636,17 @@ func hero_attack() -> void:
 	damage_bonus += int(
 		hero.temporary_damage_bonus
 	)
+	damage_bonus += barbarian_power_bonus
+	attack_bonus += get_prepared_paladin_attack_bonus(hero)
+	damage_bonus += get_prepared_paladin_damage_bonus(hero)
+	attack_bonus += get_prepared_rogue_attack_bonus(hero)
+	damage_bonus += get_prepared_rogue_damage_bonus(hero)
+	attack_bonus += get_prepared_ranger_attack_bonus(hero)
+	damage_bonus += get_prepared_ranger_damage_bonus(hero)
+	attack_bonus += get_prepared_bard_attack_bonus(hero)
+	attack_bonus += get_prepared_fighter_attack_bonus(hero)
+	damage_bonus += get_prepared_fighter_damage_bonus(hero)
+	attack_bonus += get_bard_song_attack_bonus(hero)
 	if is_enemy_flanked():
 		attack_bonus += int(hero.feat_flanking_attack_bonus)
 		damage_bonus += int(hero.feat_flanking_damage_bonus)
@@ -1817,6 +1870,18 @@ func hero_attack() -> void:
 
 	if using_smite:
 		hero.consume_smite_evil()
+		clear_prepared_class_attack()
+	elif barbarian_power_bonus > 0:
+		clear_prepared_class_attack()
+	elif paladin_power_prepared:
+		clear_prepared_class_attack()
+	elif rogue_power_prepared:
+		clear_prepared_class_attack()
+	elif ranger_power_prepared:
+		clear_prepared_class_attack()
+	elif bard_power_prepared:
+		clear_prepared_class_attack()
+	elif fighter_power_prepared:
 		clear_prepared_class_attack()
 	
 	await finish_player_attack(hero)
@@ -2209,6 +2274,7 @@ func opportunity_attack(
 			damage_bonus += int(
 				hero.feat_ranged_damage_bonus
 			)
+	attack_bonus += get_bard_song_attack_bonus(attacker)
 	
 	var target_ac: int = 10
 	
@@ -2426,6 +2492,7 @@ func start_stage(
 ):
 	clear_prepared_class_attack()
 	battle_turn_count = 1
+	bard_song_end_round = 0
 	battle_finished = false
 	initiative_started = false
 	scenario_intro_running = false
@@ -2456,11 +2523,16 @@ func start_stage(
 	
 	if is_instance_valid(hero) and hero.is_raging:
 		hero.end_rage()
+	if is_instance_valid(hero):
+		hero.end_druid_form()
+		hero.encounter_powers_used.clear()
 	reset_stage_units(stage_number)
 	apply_player_presets()
 	if is_instance_valid(hero):
 		hero.rage_uses_this_battle = 0
 		hero.rage_used = false
+		hero.smite_evil_used = false
+		hero.smite_evil_active = false
 		hero.opportunity_attacks_used = 0
 		hero.has_opportunity_attacked = false
 		hero.unstoppable_active = false
@@ -2842,63 +2914,31 @@ func use_class_skill():
 	
 	match unit_class:
 		"Bárbaro":
-			if unit == hero:
-				use_barbarian_rage()
-		
-		"Bardo":
-			print("Música Bárdica selecionada.")
-		
-		"Clérigo":
-			print(
-				"Expulsar Mortos-Vivos selecionado."
-			)
-		
-		"Druida":
-			print("Forma Selvagem selecionada.")
-		
-		"Feiticeiro":
-			print(
-				"Abrir seleção de magia arcana."
-			)
+			open_barbarian_abilities(unit)
+			return
+		"Bruxo":
+			open_warlock_abilities(unit)
+			return
 		
 		"Guerreiro":
-			print("Tática de Combate selecionada.")
+			open_fighter_abilities(unit)
+			return
 		
 		"Ladino":
-			if not unit.has_method("can_use_hide_skill") or not unit.can_use_hide_skill():
-				show_floating_text_on_unit(unit, "NÃO PODE ESCONDER-SE", 18, "miss")
-				return
-			unit.use_hide_skill()
-			if unit == hero:
-				rogue_was_spotted = false
-				rogue_hide_check_done = false
-			show_floating_text_on_unit(unit, "ESCONDIDO", 20, "utility")
-			check_hidden_rogue_perception(unit)
-		
-		"Mago":
-			print("Abrir magias preparadas.")
+			open_rogue_abilities(unit)
+			return
 		
 		"Monge":
-			if unit.has_attacked:
-				show_floating_text_on_unit(unit, "ATAQUE USADO", 18, "miss")
-				return
-			prepared_class_attack = "flurry"
-			prepared_class_attacker = unit
-			show_floating_text_on_unit(unit, "ESCOLHA O ALVO", 18, "utility")
-			show_attack_area_for_unit(unit)
+			open_monk_abilities(unit)
+			return
 		
 		"Paladino":
-			if unit.has_attacked or not unit.has_method("can_use_smite_evil") or not unit.can_use_smite_evil():
-				show_floating_text_on_unit(unit, "DESTRUIR INDISPONÍVEL", 18, "miss")
-				return
-			unit.activate_smite_evil()
-			prepared_class_attack = "smite"
-			prepared_class_attacker = unit
-			show_floating_text_on_unit(unit, "ESCOLHA O ALVO", 18, "utility")
-			show_attack_area_for_unit(unit)
+			open_paladin_abilities(unit)
+			return
 		
 		"Ranger":
-			print("Inimigo Predileto selecionado.")
+			open_ranger_abilities(unit)
+			return
 		
 		_:
 			print(
@@ -2909,12 +2949,982 @@ func use_class_skill():
 	update_class_skill_button()
 	update_movement_label()
 
+
+func get_class_power_member_id(unit: Node2D) -> String:
+	if unit == hero:
+		return PartyManager.HERO_MEMBER_ID
+	if is_npc_unit(unit):
+		return str(unit.npc_id)
+	return ""
+
+
+func is_melee_unit(unit: Node2D) -> bool:
+	if unit == hero:
+		return hero.get_weapon_type() == "melee"
+	return is_npc_unit(unit) and str(unit.weapon_type) == "melee"
+
+
+func open_barbarian_abilities(unit: Node2D) -> void:
+	if not is_instance_valid(unit) or get_unit_class_name(unit) != "Bárbaro":
+		return
+	open_class_ability_menu(unit, "Bárbaro", BarbarianPowers.get_powers())
+
+
+func open_paladin_abilities(unit: Node2D) -> void:
+	if not is_instance_valid(unit) or get_unit_class_name(unit) != "Paladino":
+		return
+	open_class_ability_menu(unit, "Paladino", PaladinPowers.get_powers())
+
+
+func open_druid_abilities(unit: Node2D) -> void:
+	if not is_instance_valid(unit) or get_unit_class_name(unit) != "Druida":
+		return
+	open_class_ability_menu(unit, "Druida", DruidPowers.get_powers())
+
+
+func open_rogue_abilities(unit: Node2D) -> void:
+	if not is_instance_valid(unit) or get_unit_class_name(unit) != "Ladino":
+		return
+	open_class_ability_menu(unit, "Ladino", RoguePowers.get_powers())
+
+
+func open_ranger_abilities(unit: Node2D) -> void:
+	if not is_instance_valid(unit) or get_unit_class_name(unit) != "Ranger":
+		return
+	open_class_ability_menu(unit, "Ranger", RangerPowers.get_powers())
+
+
+func open_cleric_abilities(unit: Node2D) -> void:
+	if not is_instance_valid(unit) or get_unit_class_name(unit) != "Clérigo":
+		return
+	open_class_ability_menu(unit, "Clérigo", ClericPowers.get_powers())
+
+
+func open_bard_abilities(unit: Node2D) -> void:
+	if not is_instance_valid(unit) or get_unit_class_name(unit) != "Bardo":
+		return
+	open_class_ability_menu(unit, "Bardo", BardPowers.get_powers())
+
+
+func open_fighter_abilities(unit: Node2D) -> void:
+	if not is_instance_valid(unit) or get_unit_class_name(unit) != "Guerreiro":
+		return
+	open_class_ability_menu(unit, "Guerreiro", FighterPowers.get_powers())
+
+
+func open_monk_abilities(unit: Node2D) -> void:
+	if not is_instance_valid(unit) or get_unit_class_name(unit) != "Monge":
+		return
+	open_class_ability_menu(unit, "Monge", MonkPowers.get_powers())
+
+
+func open_warlock_abilities(unit: Node2D) -> void:
+	if not is_instance_valid(unit) or get_unit_class_name(unit) != "Bruxo":
+		return
+	open_class_ability_menu(unit, "Bruxo", WarlockPowers.get_powers())
+
+
+func open_class_ability_menu(unit: Node2D, ability_class: String, powers: Array) -> void:
+	var available_powers: Array = powers.duplicate(true)
+	var unit_level: int = int(unit.level)
+	if unit_level >= 13:
+		available_powers = available_powers.filter(func(power): return str(power.get("frequency", "")) != "Por encontro")
+	if unit_level >= 15:
+		available_powers = available_powers.filter(func(power): return str(power.get("frequency", "")) != "Diário")
+	var selected_powers: Dictionary = unit.selected_class_powers if unit == hero else {}
+	available_powers.append_array(ClassPowerProgressionData.get_available_powers(ability_class, unit_level, selected_powers))
+	var frequency_order := {"Sem limite": 0, "Por encontro": 1, "Diário": 2}
+	available_powers.sort_custom(func(a, b):
+		var first_order: int = int(frequency_order.get(str(a.get("frequency", "")), 3))
+		var second_order: int = int(frequency_order.get(str(b.get("frequency", "")), 3))
+		return first_order < second_order if first_order != second_order else int(a.get("level", 1)) < int(b.get("level", 1))
+	)
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.queue_free()
+	class_ability_popup = PopupPanel.new()
+	class_ability_popup.name = "ClassAbilities"
+	ui_layer.add_child(class_ability_popup)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 18)
+	margin.add_theme_constant_override("margin_right", 18)
+	margin.add_theme_constant_override("margin_top", 14)
+	margin.add_theme_constant_override("margin_bottom", 14)
+	class_ability_popup.add_child(margin)
+	var outer := VBoxContainer.new()
+	outer.custom_minimum_size = Vector2(540, 0)
+	outer.add_theme_constant_override("separation", 10)
+	margin.add_child(outer)
+	var heading := Label.new()
+	heading.text = "Habilidades — %s" % ability_class
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	heading.add_theme_font_size_override("font_size", 23)
+	outer.add_child(heading)
+	var totals: Dictionary = LevelProgressionData.power_totals_for_level(unit_level)
+	var totals_label := Label.new()
+	totals_label.text = "Poderes conhecidos (TPC)\n%d sem limite  ·  %d encontro  ·  %d diários  ·  %d utilitários" % [totals["at_will"], totals["encounter"], totals["daily"], totals["utility"]]
+	if ability_class in ["Mago", "Feiticeiro"]:
+		totals_label.text += "  ·  magias à parte"
+	totals_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	totals_label.add_theme_font_size_override("font_size", 15)
+	totals_label.add_theme_color_override("font_color", Color(0.75, 0.8, 0.73))
+	outer.add_child(totals_label)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(540, 390)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.custom_minimum_size = Vector2(525, 0)
+	list.add_theme_constant_override("separation", 10)
+	scroll.add_child(list)
+	var current_group: String = ""
+	for power in available_powers:
+		var power_id: String = str(power["id"])
+		var frequency: String = str(power["frequency"])
+		if frequency != current_group:
+			current_group = frequency
+			var group_heading := Label.new()
+			group_heading.text = frequency.to_upper()
+			group_heading.add_theme_font_size_override("font_size", 16)
+			group_heading.add_theme_color_override("font_color", Color(0.94, 0.75, 0.28))
+			list.add_child(group_heading)
+		var card := PanelContainer.new()
+		var card_style := StyleBoxFlat.new()
+		card_style.bg_color = Color(0.12, 0.15, 0.17, 0.98)
+		card_style.border_color = Color(0.36, 0.48, 0.43)
+		card_style.set_border_width_all(2)
+		card_style.set_corner_radius_all(9)
+		card_style.set_content_margin_all(8)
+		card.add_theme_stylebox_override("panel", card_style)
+		list.add_child(card)
+		var row := VBoxContainer.new()
+		card.add_child(row)
+		var button := Button.new()
+		button.custom_minimum_size.y = 72 if OS.has_feature("mobile") else 54
+		button.add_theme_font_size_override("font_size", 19)
+		button.text = "%s%s%s" % [power["name"], "  ·  Nv. %d" % int(power["level"]) if power.has("level") else "", "  ·  Utilitário" if bool(power.get("utility", false)) else ""]
+		if ClassPowerProgressionData.is_progression_power(power_id):
+			button.disabled = not can_select_progression_power(unit, power_id)
+			button.pressed.connect(select_progression_power.bind(unit, power_id))
+		else:
+			match ability_class:
+				"Bárbaro":
+					button.disabled = not can_select_barbarian_power(unit, power_id)
+					button.pressed.connect(select_barbarian_power.bind(unit, power_id))
+				"Paladino":
+					button.disabled = not can_select_paladin_power(unit, power_id)
+					button.pressed.connect(select_paladin_power.bind(unit, power_id))
+				"Druida":
+					button.disabled = not can_select_druid_power(unit, power_id)
+					button.pressed.connect(select_druid_power.bind(unit, power_id))
+				"Ladino":
+					button.disabled = not can_select_rogue_power(unit, power_id)
+					button.pressed.connect(select_rogue_power.bind(unit, power_id))
+				"Ranger":
+					button.disabled = not can_select_ranger_power(unit, power_id)
+					button.pressed.connect(select_ranger_power.bind(unit, power_id))
+				"Clérigo":
+					button.disabled = not can_select_cleric_power(unit, power_id)
+					button.pressed.connect(select_cleric_power.bind(unit, power_id))
+				"Bardo":
+					button.disabled = not can_select_bard_power(unit, power_id)
+					button.pressed.connect(select_bard_power.bind(unit, power_id))
+				"Guerreiro":
+					button.disabled = not can_select_fighter_power(unit, power_id)
+					button.pressed.connect(select_fighter_power.bind(unit, power_id))
+				"Monge":
+					button.disabled = not can_select_monk_power(unit, power_id)
+					button.pressed.connect(select_monk_power.bind(unit, power_id))
+				"Bruxo":
+					button.disabled = not can_select_warlock_power(unit, power_id)
+					button.pressed.connect(select_warlock_power.bind(unit, power_id))
+		row.add_child(button)
+		var detail := Label.new()
+		detail.text = str(power["description"])
+		if button.disabled:
+			if ClassPowerProgressionData.is_progression_power(power_id):
+				var progression_power: Dictionary = ClassPowerProgressionData.get_power_by_id(power_id)
+				if str(progression_power.get("frequency", "")) == "Diário" and not is_class_daily_power_available(unit, power_id):
+					detail.text += " Já usado; recupere após descansar."
+				elif unit.encounter_powers_used.has(power_id):
+					detail.text += " Já usado neste combate."
+				else:
+					detail.text += " Requer ação principal livre."
+			elif power_id == "barbarian_decisive" and not is_class_daily_power_available(unit, power_id):
+				detail.text += " Já usada; recupere-a descansando."
+			elif power_id == "paladin_verdict" and not is_class_daily_power_available(unit, power_id):
+				detail.text += " Já usada; recupere-a descansando."
+			elif power_id == "druid_life_circle" and not is_class_daily_power_available(unit, power_id):
+				detail.text += " Já usada; recupere-a descansando."
+			elif power_id == "druid_life_circle" and not has_wounded_allied_unit():
+				detail.text += " Nenhum aliado precisa de cura."
+			elif power_id == "barbarian_rage":
+				detail.text += " Fúria ativa ou usos esgotados neste combate."
+			elif power_id == "paladin_smite" and not unit.can_use_smite_evil():
+				detail.text += " Já usada neste combate."
+			elif power_id == "druid_wild_aspect" and unit.encounter_powers_used.has(power_id):
+				detail.text += " Já usada neste combate."
+			elif power_id == "rogue_hide":
+				detail.text += " Já se escondeu neste turno ou já atacou."
+			elif power_id == "rogue_precise_strike" and unit.encounter_powers_used.has(power_id):
+				detail.text += " Já usada neste combate."
+			elif power_id == "rogue_final_cut" and not is_class_daily_power_available(unit, power_id):
+				detail.text += " Já usada; recupere-a descansando."
+			elif power_id == "ranger_trail_step" and unit.encounter_powers_used.has(power_id):
+				detail.text += " Já usada neste combate."
+			elif power_id == "ranger_relentless_hunt" and not is_class_daily_power_available(unit, power_id):
+				detail.text += " Já usada; recupere-a descansando."
+			elif power_id == "cleric_helping_prayer" and unit.encounter_powers_used.has(power_id):
+				detail.text += " Já usada neste combate."
+			elif power_id == "cleric_renewing_dawn" and not is_class_daily_power_available(unit, power_id):
+				detail.text += " Já usada; recupere-a descansando."
+			elif power_id == "bard_courage_refrain" and unit.encounter_powers_used.has(power_id):
+				detail.text += " Já usada neste combate."
+			elif power_id == "bard_renewal_song" and not is_class_daily_power_available(unit, power_id):
+				detail.text += " Já usada; recupere-a descansando."
+			elif power_id == "bard_renewal_song" and not has_wounded_allied_unit():
+				detail.text += " Nenhum aliado precisa de cura."
+			elif power_id == "fighter_steady_stance" and unit.encounter_powers_used.has(power_id):
+				detail.text += " Já usada neste combate."
+			elif power_id == "fighter_breaking_strike" and not is_class_daily_power_available(unit, power_id):
+				detail.text += " Já usada; recupere-a descansando."
+			elif power_id == "monk_flurry" and unit.encounter_powers_used.has(power_id):
+				detail.text += " Já usada neste combate."
+			elif power_id == "warlock_binding_burst" and unit.encounter_powers_used.has(power_id):
+				detail.text += " Já usada neste combate."
+			elif power_id in ["monk_inner_force", "warlock_pact_judgment"] and not is_class_daily_power_available(unit, power_id):
+				detail.text += " Já usada; recupere-a descansando."
+			elif ability_class == "Bruxo":
+				detail.text += " Requer ação de ataque livre."
+			elif ability_class == "Bardo" or ability_class == "Guerreiro":
+				detail.text += " Requer ação principal livre."
+			elif ability_class == "Clérigo" and power_id != "cleric_guarding_light" and not has_wounded_allied_unit():
+				detail.text += " Nenhum aliado precisa de cura."
+			elif ability_class == "Clérigo":
+				detail.text += " Requer ação principal livre."
+			elif ability_class == "Ranger" and power_id == "ranger_trail_step":
+				detail.text += " Requer movimento possível."
+			elif ability_class == "Ranger":
+				detail.text += " Requer ação de ataque livre."
+			elif ability_class == "Ladino":
+				detail.text += " Requer ação de ataque livre."
+			elif ability_class == "Druida":
+				detail.text += " Requer ação principal livre."
+			else:
+				detail.text += " Requer arma corpo a corpo e ação de ataque livre."
+		detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		detail.add_theme_font_size_override("font_size", 16)
+		detail.add_theme_color_override("font_color", Color(0.82, 0.83, 0.78))
+		detail.custom_minimum_size.y = 32
+		row.add_child(detail)
+	var close_button := Button.new()
+	close_button.text = "Fechar"
+	close_button.custom_minimum_size.y = 50
+	close_button.pressed.connect(class_ability_popup.hide)
+	outer.add_child(close_button)
+	class_ability_popup.popup_centered(Vector2i(620, 590))
+
+
+func can_select_barbarian_power(unit: Node2D, power_id: String) -> bool:
+	if not is_instance_valid(unit) or unit != get_acting_unit():
+		return false
+	if power_id == "barbarian_rage":
+		return unit.has_method("can_use_rage") and unit.can_use_rage()
+	if unit.has_attacked or not is_melee_unit(unit):
+		return false
+	if power_id == "barbarian_decisive":
+		return is_class_daily_power_available(unit, power_id)
+	return power_id == "barbarian_impetuous"
+
+
+func select_barbarian_power(unit: Node2D, power_id: String) -> void:
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.hide()
+	if not can_select_barbarian_power(unit, power_id):
+		return
+	if power_id == "barbarian_rage":
+		if unit == hero:
+			use_barbarian_rage()
+		else:
+			unit.activate_rage(battle_turn_count)
+			show_floating_text_on_unit(unit, "FÚRIA!", 26, "critical")
+			update_class_skill_button()
+			update_active_effects_panel()
+		return
+	prepared_class_attack = power_id
+	prepared_class_attacker = unit
+	show_floating_text_on_unit(unit, "ESCOLHA O ALVO", 18, "utility")
+	show_attack_area_for_unit(unit)
+	update_class_skill_button()
+
+
+func get_prepared_barbarian_damage_bonus(unit: Node2D) -> int:
+	if prepared_class_attacker != unit:
+		return 0
+	if prepared_class_attack == "barbarian_impetuous":
+		return 1
+	if prepared_class_attack == "barbarian_decisive":
+		return 4
+	return 0
+
+
+func consume_prepared_barbarian_power(unit: Node2D) -> bool:
+	if prepared_class_attacker != unit:
+		return true
+	if prepared_class_attack == "barbarian_decisive":
+		return consume_class_daily_power(unit, prepared_class_attack)
+	return true
+
+
+func is_class_daily_power_available(unit: Node2D, power_id: String) -> bool:
+	var member_id: String = get_class_power_member_id(unit)
+	if PartyManager.has_member(member_id):
+		return PartyManager.is_daily_power_available(member_id, power_id)
+	return is_npc_unit(unit) and not unit.daily_powers_used.has(power_id)
+
+
+func consume_class_daily_power(unit: Node2D, power_id: String) -> bool:
+	var member_id: String = get_class_power_member_id(unit)
+	if PartyManager.has_member(member_id):
+		return PartyManager.consume_daily_power(member_id, power_id)
+	if not is_npc_unit(unit) or unit.daily_powers_used.has(power_id):
+		return false
+	unit.daily_powers_used.append(power_id)
+	return true
+
+
+func can_select_paladin_power(unit: Node2D, power_id: String) -> bool:
+	if not is_instance_valid(unit) or unit != get_acting_unit():
+		return false
+	if unit.has_attacked or not is_melee_unit(unit):
+		return false
+	match power_id:
+		"paladin_guarding_strike":
+			return true
+		"paladin_smite":
+			return unit.has_method("can_use_smite_evil") and unit.can_use_smite_evil()
+		"paladin_verdict":
+			return is_class_daily_power_available(unit, power_id)
+	return false
+
+
+func select_paladin_power(unit: Node2D, power_id: String) -> void:
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.hide()
+	if not can_select_paladin_power(unit, power_id):
+		return
+	clear_prepared_class_attack()
+	if power_id == "paladin_smite":
+		unit.activate_smite_evil()
+		prepared_class_attack = "smite"
+	else:
+		prepared_class_attack = power_id
+	prepared_class_attacker = unit
+	show_floating_text_on_unit(unit, "ESCOLHA O ALVO", 18, "utility")
+	show_attack_area_for_unit(unit)
+	update_class_skill_button()
+
+
+func is_prepared_paladin_power(unit: Node2D) -> bool:
+	return prepared_class_attacker == unit and prepared_class_attack in [
+		"paladin_guarding_strike", "paladin_verdict"
+	]
+
+
+func get_prepared_paladin_attack_bonus(unit: Node2D) -> int:
+	return 1 if prepared_class_attacker == unit and prepared_class_attack == "paladin_guarding_strike" else 0
+
+
+func get_prepared_paladin_damage_bonus(unit: Node2D) -> int:
+	return 4 if prepared_class_attacker == unit and prepared_class_attack == "paladin_verdict" else 0
+
+
+func consume_prepared_paladin_power(unit: Node2D) -> bool:
+	if prepared_class_attacker == unit and prepared_class_attack == "paladin_verdict":
+		return consume_class_daily_power(unit, prepared_class_attack)
+	return true
+
+
+func can_select_rogue_power(unit: Node2D, power_id: String) -> bool:
+	if not is_instance_valid(unit) or unit != get_acting_unit() or get_unit_class_name(unit) != "Ladino":
+		return false
+	match power_id:
+		"rogue_hide":
+			return unit.has_method("can_use_hide_skill") and unit.can_use_hide_skill()
+		"rogue_precise_strike":
+			return not unit.has_attacked and not unit.encounter_powers_used.has(power_id)
+		"rogue_final_cut":
+			return not unit.has_attacked and is_class_daily_power_available(unit, power_id)
+	return false
+
+
+func select_rogue_power(unit: Node2D, power_id: String) -> void:
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.hide()
+	if not can_select_rogue_power(unit, power_id):
+		return
+	if power_id == "rogue_hide":
+		unit.use_hide_skill()
+		if unit == hero:
+			rogue_was_spotted = false
+			rogue_hide_check_done = false
+		show_floating_text_on_unit(unit, "ESCONDIDO", 20, "utility")
+		check_hidden_rogue_perception(unit)
+	else:
+		clear_prepared_class_attack()
+		prepared_class_attack = power_id
+		prepared_class_attacker = unit
+		show_floating_text_on_unit(unit, "ESCOLHA O ALVO", 18, "utility")
+		show_attack_area_for_unit(unit)
+	update_class_skill_button()
+
+
+func is_prepared_rogue_power(unit: Node2D) -> bool:
+	return prepared_class_attacker == unit and prepared_class_attack in [
+		"rogue_precise_strike", "rogue_final_cut"
+	]
+
+
+func get_prepared_rogue_attack_bonus(unit: Node2D) -> int:
+	return 2 if prepared_class_attacker == unit and prepared_class_attack == "rogue_precise_strike" else 0
+
+
+func get_prepared_rogue_damage_bonus(unit: Node2D) -> int:
+	return 4 if prepared_class_attacker == unit and prepared_class_attack == "rogue_final_cut" else 0
+
+
+func consume_prepared_rogue_power(unit: Node2D) -> bool:
+	if not is_prepared_rogue_power(unit):
+		return true
+	if prepared_class_attack == "rogue_final_cut":
+		return consume_class_daily_power(unit, prepared_class_attack)
+	if unit.encounter_powers_used.has(prepared_class_attack):
+		return false
+	unit.encounter_powers_used.append(prepared_class_attack)
+	return true
+
+
+func can_select_ranger_power(unit: Node2D, power_id: String) -> bool:
+	if not is_instance_valid(unit) or unit != get_acting_unit() or get_unit_class_name(unit) != "Ranger":
+		return false
+	match power_id:
+		"ranger_field_aim":
+			return not unit.has_attacked
+		"ranger_trail_step":
+			return not unit.encounter_powers_used.has(power_id)
+		"ranger_relentless_hunt":
+			return not unit.has_attacked and is_class_daily_power_available(unit, power_id)
+	return false
+
+
+func select_ranger_power(unit: Node2D, power_id: String) -> void:
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.hide()
+	if not can_select_ranger_power(unit, power_id):
+		return
+	if power_id == "ranger_trail_step":
+		unit.encounter_powers_used.append(power_id)
+		unit.current_movement_meters += 3.0
+		show_floating_text_on_unit(unit, "MOVIMENTO +3 m", 18, "utility")
+		show_movement_area()
+		update_movement_label()
+		refresh_action_ui()
+		return
+	clear_prepared_class_attack()
+	prepared_class_attack = power_id
+	prepared_class_attacker = unit
+	show_floating_text_on_unit(unit, "ESCOLHA O ALVO", 18, "utility")
+	show_attack_area_for_unit(unit)
+	update_class_skill_button()
+
+
+func is_prepared_ranger_power(unit: Node2D) -> bool:
+	return prepared_class_attacker == unit and prepared_class_attack in [
+		"ranger_field_aim", "ranger_relentless_hunt"
+	]
+
+
+func get_prepared_ranger_attack_bonus(unit: Node2D) -> int:
+	return 1 if prepared_class_attacker == unit and prepared_class_attack == "ranger_field_aim" else 0
+
+
+func get_prepared_ranger_damage_bonus(unit: Node2D) -> int:
+	return 4 if prepared_class_attacker == unit and prepared_class_attack == "ranger_relentless_hunt" else 0
+
+
+func consume_prepared_ranger_power(unit: Node2D) -> bool:
+	if prepared_class_attacker == unit and prepared_class_attack == "ranger_relentless_hunt":
+		return consume_class_daily_power(unit, prepared_class_attack)
+	return true
+
+
+func can_select_cleric_power(unit: Node2D, power_id: String) -> bool:
+	if not is_instance_valid(unit) or unit != get_acting_unit() or get_unit_class_name(unit) != "Clérigo":
+		return false
+	if unit.has_attacked:
+		return false
+	match power_id:
+		"cleric_guarding_light":
+			return true
+		"cleric_helping_prayer":
+			return not unit.encounter_powers_used.has(power_id) and has_wounded_allied_unit()
+		"cleric_renewing_dawn":
+			return is_class_daily_power_available(unit, power_id) and has_wounded_allied_unit()
+	return false
+
+
+func get_cleric_power_healing(unit: Node2D, power_id: String) -> int:
+	var wisdom_modifier: int = floori((float(unit.wisdom) - 10.0) / 2.0)
+	if unit.has_method("get_wisdom_modifier"):
+		wisdom_modifier = int(unit.get_wisdom_modifier())
+	var healing: int = 4 + maxi(0, wisdom_modifier) + floori(float(unit.level) / 2.0)
+	if power_id == "cleric_helping_prayer":
+		healing += 2
+	if unit == hero:
+		healing += int(hero.feat_healing_bonus)
+	elif is_npc_unit(unit) and unit.feats.has("Mãos Generosas"):
+		healing += 2
+	return healing
+
+
+func select_cleric_power(unit: Node2D, power_id: String) -> void:
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.hide()
+	if not can_select_cleric_power(unit, power_id):
+		return
+	var wounded_allies: Array[Node2D] = []
+	if power_id != "cleric_guarding_light":
+		for ally in get_living_allied_units_for_spells():
+			if int(ally.hp) < int(ally.max_hp):
+				wounded_allies.append(ally)
+		if wounded_allies.is_empty():
+			return
+	if power_id == "cleric_renewing_dawn" and not consume_class_daily_power(unit, power_id):
+		return
+	clear_prepared_class_attack()
+	match power_id:
+		"cleric_guarding_light":
+			unit.cleric_guard_active = true
+			show_floating_text_on_unit(unit, "LUZ VIGILANTE", 20, "utility")
+		"cleric_helping_prayer":
+			var most_wounded: Node2D = wounded_allies[0]
+			for ally in wounded_allies:
+				if float(ally.hp) / float(ally.max_hp) < float(most_wounded.hp) / float(most_wounded.max_hp):
+					most_wounded = ally
+			unit.encounter_powers_used.append(power_id)
+			apply_healing_to_unit(most_wounded, get_cleric_power_healing(unit, power_id))
+			show_floating_text_on_unit(unit, "PRECE DE SOCORRO", 20, "heal")
+		"cleric_renewing_dawn":
+			var healing: int = get_cleric_power_healing(unit, power_id)
+			for ally in wounded_allies:
+				apply_healing_to_unit(ally, healing)
+			show_floating_text_on_unit(unit, "AURORA RENOVADORA", 20, "heal")
+	unit.has_attacked = true
+	clear_attack_area()
+	refresh_action_ui()
+	update_active_effects_panel()
+
+
+func can_select_bard_power(unit: Node2D, power_id: String) -> bool:
+	if not is_instance_valid(unit) or unit != get_acting_unit() or get_unit_class_name(unit) != "Bardo":
+		return false
+	if unit.has_attacked:
+		return false
+	match power_id:
+		"bard_precise_rhythm":
+			return true
+		"bard_courage_refrain":
+			return not unit.encounter_powers_used.has(power_id)
+		"bard_renewal_song":
+			return is_class_daily_power_available(unit, power_id) and has_wounded_allied_unit()
+	return false
+
+
+func get_bard_song_attack_bonus(unit: Node2D) -> int:
+	if not is_instance_valid(unit):
+		return 0
+	if bard_song_end_round < battle_turn_count or bard_song_end_round <= 0:
+		return 0
+	if unit == hero or unit == animal_companion:
+		return 1
+	if is_npc_unit(unit) and str(unit.faction) == "ally":
+		return 1
+	return 0
+
+
+func get_bard_renewal_healing(unit: Node2D) -> int:
+	var charisma_modifier: int = floori((float(unit.charisma) - 10.0) / 2.0)
+	if unit.has_method("get_charisma_modifier"):
+		charisma_modifier = int(unit.get_charisma_modifier())
+	var healing: int = 4 + maxi(0, charisma_modifier) + floori(float(unit.level) / 2.0)
+	if unit == hero:
+		healing += int(hero.feat_healing_bonus)
+	elif is_npc_unit(unit) and unit.feats.has("Acordes Fortes"):
+		healing += 2
+	return healing
+
+
+func get_bard_refrain_duration(unit: Node2D) -> int:
+	var unit_feats: Array = unit.selected_feats if unit == hero else unit.feats
+	return 2 + (1 if unit_feats.has("Refrão Duradouro") else 0)
+
+
+func select_bard_power(unit: Node2D, power_id: String) -> void:
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.hide()
+	if not can_select_bard_power(unit, power_id):
+		return
+	if power_id == "bard_precise_rhythm":
+		clear_prepared_class_attack()
+		prepared_class_attack = power_id
+		prepared_class_attacker = unit
+		show_floating_text_on_unit(unit, "ESCOLHA O ALVO", 18, "utility")
+		show_attack_area_for_unit(unit)
+		update_class_skill_button()
+		return
+	var wounded_allies: Array[Node2D] = []
+	if power_id == "bard_renewal_song":
+		for ally in get_living_allied_units_for_spells():
+			if int(ally.hp) < int(ally.max_hp):
+				wounded_allies.append(ally)
+		if wounded_allies.is_empty() or not consume_class_daily_power(unit, power_id):
+			return
+	clear_prepared_class_attack()
+	if power_id == "bard_courage_refrain":
+		unit.encounter_powers_used.append(power_id)
+		bard_song_end_round = battle_turn_count + get_bard_refrain_duration(unit) - 1
+		show_floating_text_on_unit(unit, "REFRÃO DE CORAGEM", 20, "utility")
+	else:
+		var healing: int = get_bard_renewal_healing(unit)
+		for ally in wounded_allies:
+			apply_healing_to_unit(ally, healing)
+		show_floating_text_on_unit(unit, "CANÇÃO DE RECOMEÇO", 20, "heal")
+	unit.has_attacked = true
+	clear_attack_area()
+	refresh_action_ui()
+	update_active_effects_panel()
+
+
+func is_prepared_bard_power(unit: Node2D) -> bool:
+	return prepared_class_attacker == unit and prepared_class_attack == "bard_precise_rhythm"
+
+
+func get_prepared_bard_attack_bonus(unit: Node2D) -> int:
+	return 1 if is_prepared_bard_power(unit) else 0
+
+
+func can_select_fighter_power(unit: Node2D, power_id: String) -> bool:
+	if not is_instance_valid(unit) or unit != get_acting_unit() or get_unit_class_name(unit) != "Guerreiro":
+		return false
+	if unit.has_attacked:
+		return false
+	match power_id:
+		"fighter_technical_strike":
+			return true
+		"fighter_steady_stance":
+			return not unit.encounter_powers_used.has(power_id)
+		"fighter_breaking_strike":
+			return is_class_daily_power_available(unit, power_id)
+	return false
+
+
+func select_fighter_power(unit: Node2D, power_id: String) -> void:
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.hide()
+	if not can_select_fighter_power(unit, power_id):
+		return
+	clear_prepared_class_attack()
+	if power_id == "fighter_steady_stance":
+		unit.encounter_powers_used.append(power_id)
+		unit.fighter_guard_active = true
+		unit.has_attacked = true
+		show_floating_text_on_unit(unit, "POSTURA FIRME", 20, "utility")
+		clear_attack_area()
+		refresh_action_ui()
+		update_active_effects_panel()
+		return
+	prepared_class_attack = power_id
+	prepared_class_attacker = unit
+	show_floating_text_on_unit(unit, "ESCOLHA O ALVO", 18, "utility")
+	show_attack_area_for_unit(unit)
+	update_class_skill_button()
+
+
+func is_prepared_fighter_power(unit: Node2D) -> bool:
+	return prepared_class_attacker == unit and prepared_class_attack in [
+		"fighter_technical_strike", "fighter_breaking_strike"
+	]
+
+
+func get_prepared_fighter_attack_bonus(unit: Node2D) -> int:
+	if prepared_class_attacker != unit:
+		return 0
+	if prepared_class_attack == "fighter_technical_strike":
+		return 1
+	if prepared_class_attack == "fighter_breaking_strike":
+		return 2
+	return 0
+
+
+func get_prepared_fighter_damage_bonus(unit: Node2D) -> int:
+	return 3 if prepared_class_attacker == unit and prepared_class_attack == "fighter_breaking_strike" else 0
+
+
+func consume_prepared_fighter_power(unit: Node2D) -> bool:
+	if prepared_class_attacker == unit and prepared_class_attack == "fighter_breaking_strike":
+		return consume_class_daily_power(unit, prepared_class_attack)
+	return true
+
+
+func has_wounded_allied_unit() -> bool:
+	for ally in get_living_allied_units_for_spells():
+		if int(ally.hp) < int(ally.max_hp):
+			return true
+	return false
+
+
+func can_select_druid_power(unit: Node2D, power_id: String) -> bool:
+	if not is_instance_valid(unit) or unit != get_acting_unit():
+		return false
+	if unit.has_attacked:
+		return false
+	match power_id:
+		"druid_barkguard":
+			return true
+		"druid_wild_aspect":
+			return not unit.druid_form_active and not unit.encounter_powers_used.has(power_id)
+		"druid_life_circle":
+			return is_class_daily_power_available(unit, power_id) and has_wounded_allied_unit()
+	return false
+
+
+func get_druid_circle_healing(unit: Node2D) -> int:
+	var wisdom_modifier: int = 0
+	if unit.has_method("get_wisdom_modifier"):
+		wisdom_modifier = int(unit.get_wisdom_modifier())
+	else:
+		wisdom_modifier = floori((float(unit.wisdom) - 10.0) / 2.0)
+	var healing: int = 4 + maxi(0, wisdom_modifier) + floori(float(unit.level) / 2.0)
+	var unit_feats: Array = unit.selected_feats if unit == hero else unit.feats
+	if unit_feats.has("Seiva Generosa"):
+		healing += 2
+	return healing
+
+
+func select_druid_power(unit: Node2D, power_id: String) -> void:
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.hide()
+	if not can_select_druid_power(unit, power_id):
+		return
+	if power_id == "druid_life_circle" and not consume_class_daily_power(unit, power_id):
+		return
+	clear_prepared_class_attack()
+	match power_id:
+		"druid_barkguard":
+			unit.druid_guard_active = true
+			show_floating_text_on_unit(unit, "CASCA VIVA", 20, "utility")
+		"druid_wild_aspect":
+			unit.encounter_powers_used.append(power_id)
+			unit.activate_druid_form(battle_turn_count)
+			show_floating_text_on_unit(unit, "ASPECTO SELVAGEM", 20, "utility")
+		"druid_life_circle":
+			var healing: int = get_druid_circle_healing(unit)
+			for ally in get_living_allied_units_for_spells():
+				if int(ally.hp) < int(ally.max_hp):
+					apply_healing_to_unit(ally, healing)
+			show_floating_text_on_unit(unit, "CÍRCULO VITAL", 20, "heal")
+	unit.has_attacked = true
+	clear_attack_area()
+	refresh_action_ui()
+	update_active_effects_panel()
+
 func clear_prepared_class_attack() -> void:
 	if prepared_class_attack == "smite" and is_instance_valid(prepared_class_attacker):
 		if "smite_evil_active" in prepared_class_attacker:
 			prepared_class_attacker.smite_evil_active = false
 	prepared_class_attack = ""
 	prepared_class_attacker = null
+
+
+func can_select_monk_power(unit: Node2D, power_id: String) -> bool:
+	if not is_instance_valid(unit) or unit != get_acting_unit() or get_unit_class_name(unit) != "Monge":
+		return false
+	if unit.has_attacked or not is_melee_unit(unit):
+		return false
+	match power_id:
+		"monk_focused_strike":
+			return true
+		"monk_flurry":
+			return not unit.encounter_powers_used.has(power_id)
+		"monk_inner_force":
+			return is_class_daily_power_available(unit, power_id)
+	return false
+
+
+func select_monk_power(unit: Node2D, power_id: String) -> void:
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.hide()
+	if not can_select_monk_power(unit, power_id):
+		return
+	clear_prepared_class_attack()
+	prepared_class_attack = power_id
+	prepared_class_attacker = unit
+	show_floating_text_on_unit(unit, "ESCOLHA O ALVO", 18, "utility")
+	show_attack_area_for_unit(unit)
+	update_class_skill_button()
+
+
+func can_select_warlock_power(unit: Node2D, power_id: String) -> bool:
+	if not is_instance_valid(unit) or unit != get_acting_unit() or get_unit_class_name(unit) != "Bruxo":
+		return false
+	if unit.has_attacked:
+		return false
+	match power_id:
+		"warlock_eldritch_spark":
+			return true
+		"warlock_binding_burst":
+			return not unit.encounter_powers_used.has(power_id)
+		"warlock_pact_judgment":
+			return is_class_daily_power_available(unit, power_id)
+	return false
+
+
+func select_warlock_power(unit: Node2D, power_id: String) -> void:
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.hide()
+	if not can_select_warlock_power(unit, power_id):
+		return
+	clear_prepared_class_attack()
+	prepared_class_attack = power_id
+	prepared_class_attacker = unit
+	show_floating_text_on_unit(unit, "ESCOLHA O ALVO", 18, "utility")
+	show_attack_area_for_unit(unit)
+	update_class_skill_button()
+
+
+func get_prepared_power_range(unit: Node2D) -> float:
+	if prepared_class_attacker == unit and prepared_class_attack.begins_with("warlock_"):
+		return 9.0
+	if prepared_class_attacker == unit and ClassPowerProgressionData.is_progression_power(prepared_class_attack):
+		var power: Dictionary = ClassPowerProgressionData.get_power_by_id(prepared_class_attack)
+		if str(power.get("mode", "")) == "magic":
+			return 9.0
+	if unit.has_method("get_weapon_range_meters"):
+		return float(unit.get_weapon_range_meters())
+	return 1.5
+
+
+func can_select_progression_power(unit: Node2D, power_id: String) -> bool:
+	if not is_instance_valid(unit) or unit != get_acting_unit() or unit.has_attacked:
+		return false
+	var power: Dictionary = ClassPowerProgressionData.get_power_by_id(power_id)
+	if power.is_empty() or str(power.get("class_name", "")) != get_unit_class_name(unit):
+		return false
+	var unlocked: bool = false
+	var selected_powers: Dictionary = unit.selected_class_powers if unit == hero else {}
+	for available in ClassPowerProgressionData.get_available_powers(get_unit_class_name(unit), int(unit.level), selected_powers):
+		if str(available.get("id", "")) == power_id:
+			unlocked = true
+			break
+	if not unlocked:
+		return false
+	match str(power.get("frequency", "")):
+		"Por encontro":
+			return not unit.encounter_powers_used.has(power_id)
+		"Diário":
+			return is_class_daily_power_available(unit, power_id)
+	return true
+
+
+func consume_progression_power(unit: Node2D, power: Dictionary) -> bool:
+	var power_id: String = str(power.get("id", ""))
+	match str(power.get("frequency", "")):
+		"Por encontro":
+			if unit.encounter_powers_used.has(power_id):
+				return false
+			unit.encounter_powers_used.append(power_id)
+		"Diário":
+			return consume_class_daily_power(unit, power_id)
+	return true
+
+
+func select_progression_power(unit: Node2D, power_id: String) -> void:
+	if is_instance_valid(class_ability_popup):
+		class_ability_popup.hide()
+	if not can_select_progression_power(unit, power_id):
+		return
+	var power: Dictionary = ClassPowerProgressionData.get_power_by_id(power_id)
+	if bool(power.get("utility", false)):
+		if not consume_progression_power(unit, power):
+			return
+		var restored: int = 0
+		var movement_gain: float = 6.0 if str(power.get("utility_effect", "recovery")) == "movement" else 3.0
+		if movement_gain < 6.0:
+			restored = mini(int(unit.max_hp) - int(unit.hp), 3 + int(power["level"]))
+			unit.hp += restored
+			if unit.has_method("update_health_bar"):
+				unit.update_health_bar()
+		unit.current_movement_meters += movement_gain
+		unit.has_attacked = true
+		show_floating_text_on_unit(unit, "+6 m" if movement_gain >= 6.0 else "+%d PV · +3 m" % restored, 20, "heal")
+		show_movement_area()
+		refresh_action_ui()
+		update_active_effects_panel()
+		return
+	clear_prepared_class_attack()
+	prepared_class_attack = power_id
+	prepared_class_attacker = unit
+	show_floating_text_on_unit(unit, "ESCOLHA O ALVO", 18, "utility")
+	show_attack_area_for_unit(unit)
+	update_class_skill_button()
+
+
+func get_progression_magic_modifier(unit: Node2D, ability_name: String) -> int:
+	var attribute_value: int = int(unit.get(ability_name))
+	return floori((float(attribute_value) - 10.0) / 2.0)
+
+
+func perform_progression_power_attack(attacker: Node2D) -> void:
+	var power: Dictionary = ClassPowerProgressionData.get_power_by_id(prepared_class_attack)
+	if power.is_empty() or str(power.get("class_name", "")) != get_unit_class_name(attacker):
+		clear_prepared_class_attack()
+		return
+	enemy = prepare_player_attack_target(attacker, enemy)
+	if not is_instance_valid(enemy):
+		return
+	if not consume_progression_power(attacker, power):
+		clear_prepared_class_attack()
+		return
+	var magic: bool = str(power.get("mode", "")) == "magic"
+	var attack_bonus: int = get_high_ground_attack_bonus_for_unit(attacker) + int(power.get("attack_bonus", 0))
+	var magic_modifier: int = 0
+	if magic:
+		magic_modifier = get_progression_magic_modifier(attacker, str(power.get("ability", "charisma")))
+		attack_bonus += int(attacker.get_base_attack_bonus()) + magic_modifier
+	elif attacker == hero:
+		attack_bonus += hero.get_weapon_attack_bonus() + int(hero.feat_attack_bonus)
+		attack_bonus += int(hero.feat_melee_attack_bonus if is_melee_unit(hero) else hero.feat_ranged_attack_bonus)
+	else:
+		attack_bonus += get_npc_attack_bonus(attacker)
+	var target: Node2D = enemy
+	var result: Dictionary = roll_attack_result(attack_bonus, int(target.get_armor_class()), attacker, target)
+	if bool(result.get("hit", false)):
+		var damage: int = 0
+		if magic:
+			damage = randi_range(1, 6) + magic_modifier
+			if attacker == hero:
+				damage += int(hero.feat_spell_damage_bonus)
+		else:
+			damage = int(hero.roll_total_weapon_damage()) if attacker == hero else get_npc_attack_damage(attacker)
+			if attacker == hero:
+				damage += int(hero.feat_damage_bonus)
+		damage = maxi(1, damage + int(power.get("bonus_damage", 0)))
+		if bool(result.get("critical_hit", false)):
+			damage *= 2
+		apply_attack_damage_to_unit(target, damage, bool(result.get("critical_hit", false)))
+	else:
+		show_floating_text_on_unit(target, "ERROU", 22, "miss")
+	clear_prepared_class_attack()
+	await finish_player_attack(attacker)
 
 
 func perform_flurry_attack(attacker: Node2D) -> void:
@@ -2926,7 +3936,19 @@ func perform_flurry_attack(attacker: Node2D) -> void:
 	if not is_instance_valid(enemy):
 		return
 	var target: Node2D = enemy
+	var power_id: String = prepared_class_attack
+	if power_id == "monk_inner_force" and not consume_class_daily_power(attacker, power_id):
+		clear_prepared_class_attack()
+		return
+	if power_id == "monk_flurry":
+		if attacker.encounter_powers_used.has(power_id):
+			clear_prepared_class_attack()
+			return
+		attacker.encounter_powers_used.append(power_id)
 	var attack_bonus: int = get_high_ground_attack_bonus_for_unit(attacker)
+	if power_id == "monk_focused_strike":
+		attack_bonus += 1
+	attack_bonus += get_bard_song_attack_bonus(attacker)
 	if attacker == hero:
 		attack_bonus += hero.get_weapon_attack_bonus()
 		attack_bonus += int(hero.feat_attack_bonus)
@@ -2937,10 +3959,12 @@ func perform_flurry_attack(attacker: Node2D) -> void:
 
 	# Os dois golpes usam o mesmo alvo e consomem uma ação de ataque.
 	clear_prepared_class_attack()
-	for strike in range(2):
+	var strike_count: int = 2 if power_id in ["flurry", "monk_flurry"] else 1
+	for strike in range(strike_count):
 		if not is_instance_valid(target) or target.hp <= 0:
 			break
-		show_floating_text_on_unit(attacker, "RAJADA %d/2" % (strike + 1), 18, "utility")
+		if strike_count == 2:
+			show_floating_text_on_unit(attacker, "RAJADA %d/2" % (strike + 1), 18, "utility")
 		var target_ac: int = int(target.get_armor_class())
 		var result: Dictionary = roll_attack_result(attack_bonus, target_ac, attacker, target)
 		if bool(result.get("hit", false)):
@@ -2953,6 +3977,8 @@ func perform_flurry_attack(attacker: Node2D) -> void:
 					damage += int(hero.feat_unarmed_damage_bonus)
 			else:
 				damage = get_npc_attack_damage(attacker)
+			if power_id == "monk_inner_force":
+				damage += 4
 			if bool(result.get("critical_hit", false)):
 				damage *= 2
 			apply_attack_damage_to_unit(target, damage, bool(result.get("critical_hit", false)))
@@ -2961,6 +3987,56 @@ func perform_flurry_attack(attacker: Node2D) -> void:
 		if strike == 0 and is_instance_valid(target) and target.hp > 0:
 			await get_tree().create_timer(0.3).timeout
 
+	await finish_player_attack(attacker)
+
+
+func perform_warlock_power_attack(attacker: Node2D) -> void:
+	if get_unit_class_name(attacker) != "Bruxo":
+		clear_prepared_class_attack()
+		return
+	enemy = prepare_player_attack_target(attacker, enemy)
+	if not is_instance_valid(enemy):
+		return
+	var power_id: String = prepared_class_attack
+	if power_id == "warlock_binding_burst":
+		if attacker.encounter_powers_used.has(power_id):
+			clear_prepared_class_attack()
+			return
+		attacker.encounter_powers_used.append(power_id)
+	elif power_id == "warlock_pact_judgment":
+		if not consume_class_daily_power(attacker, power_id):
+			clear_prepared_class_attack()
+			return
+	var charisma_bonus: int = 0
+	if attacker == hero:
+		charisma_bonus = hero.get_charisma_modifier()
+	else:
+		charisma_bonus = floori((float(attacker.charisma) - 10.0) / 2.0)
+	var attack_bonus: int = int(attacker.get_base_attack_bonus()) + charisma_bonus
+	attack_bonus += get_high_ground_attack_bonus_for_unit(attacker)
+	if attacker == hero and hero.has_feat("Selo Preciso"):
+		attack_bonus += 1
+	elif is_npc_unit(attacker) and attacker.feats.has("Selo Preciso"):
+		attack_bonus += 1
+	var target: Node2D = enemy
+	var result: Dictionary = roll_attack_result(attack_bonus, int(target.get_armor_class()), attacker, target)
+	if bool(result.get("hit", false)):
+		var bonus: int = 0
+		if power_id == "warlock_binding_burst":
+			bonus = 2
+		elif power_id == "warlock_pact_judgment":
+			bonus = 5
+		var damage: int = maxi(1, randi_range(1, 6) + charisma_bonus + bonus)
+		if attacker == hero:
+			damage += int(hero.feat_spell_damage_bonus)
+		elif attacker.feats.has("Pacto Intenso"):
+			damage += 1
+		if bool(result.get("critical_hit", false)):
+			damage *= 2
+		apply_attack_damage_to_unit(target, damage, bool(result.get("critical_hit", false)))
+	else:
+		show_floating_text_on_unit(target, "ERROU", 22, "miss")
+	clear_prepared_class_attack()
 	await finish_player_attack(attacker)
 
 func get_smite_status_text() -> String:
@@ -3044,6 +4120,7 @@ func get_player_save_data() -> Dictionary:
 		
 		"hero_feats":
 			GameState.hero_feats.duplicate(true),
+		"hero_class_power_choices": GameState.hero_class_power_choices.duplicate(true),
 		
 		"hero_equipped_weapon":
 			GameState.hero_equipped_weapon,
@@ -3181,6 +4258,7 @@ func get_player_save_data() -> Dictionary:
 		player_data["hero_feats"] = (
 			hero.selected_feats.duplicate(true)
 		)
+		player_data["hero_class_power_choices"] = hero.selected_class_powers.duplicate(true)
 		
 		player_data["hero_equipped_weapon"] = (
 			hero.equipped_weapon
@@ -3321,6 +4399,7 @@ func sync_hero_to_game_state() -> void:
 	GameState.hero_feats = (
 		hero.selected_feats.duplicate(true)
 	)
+	GameState.hero_class_power_choices = hero.selected_class_powers.duplicate(true)
 	
 	# =====================================================
 	# MAGIAS CONHECIDAS
@@ -3642,6 +4721,8 @@ func update_magic_button() -> void:
 	)
 	
 	if not is_instance_valid(hero):
+		return
+	if not LevelUpManager.new().is_spellcasting_class(hero.character_class):
 		return
 	
 	var acting_unit: Node2D = get_acting_unit()
@@ -4257,17 +5338,13 @@ func update_class_skill_button() -> void:
 	)
 	
 	var skill_labels: Dictionary = {
-		"Bárbaro": "Fúria",
-		"Bardo": "Música Bárdica",
-		"Clérigo": "Expulsar Mortos-Vivos",
-		"Druida": "Forma Selvagem",
-		"Feiticeiro": "Poder da Linhagem",
-		"Guerreiro": "Tática de Combate",
-		"Ladino": "Esconder-se",
-		"Mago": "Tradição Arcana",
-		"Monge": "Rajada de Golpes",
-		"Paladino": "Destruir o Mal",
-		"Ranger": "Inimigo Predileto"
+		"Bárbaro": "Habilidades",
+		"Bruxo": "Habilidades",
+		"Guerreiro": "Habilidades",
+		"Ladino": "Habilidades",
+		"Monge": "Habilidades",
+		"Paladino": "Habilidades",
+		"Ranger": "Habilidades"
 	}
 	
 	if not skill_labels.has(unit_class):
@@ -4279,33 +5356,10 @@ func update_class_skill_button() -> void:
 	
 	var button_disabled: bool = false
 	
-	if unit_class == "Bárbaro" and unit == hero:
-		if hero.is_raging:
-			button_text = "Fúria Ativa"
-			button_disabled = true
-		elif not hero.can_use_rage():
-			button_text = "Fúria Usada"
-			button_disabled = true
-	
-	if unit_class == "Paladino":
-		if unit.has_method("can_use_smite_evil"):
-			button_disabled = (
-				not unit.can_use_smite_evil()
-				and not (prepared_class_attack == "smite" and prepared_class_attacker == unit)
-			)
-		if prepared_class_attack == "smite" and prepared_class_attacker == unit:
-			button_text = "Destruir: alvo?"
-			button_disabled = true
-
-	if unit_class == "Ladino" and unit.has_method("can_use_hide_skill"):
-		button_disabled = not unit.can_use_hide_skill()
-		if "is_hidden" in unit and unit.is_hidden:
-			button_text = "Escondido"
-
-	if unit_class == "Monge":
+	if unit_class in ["Monge", "Bruxo"]:
 		button_disabled = unit.has_attacked
-		if prepared_class_attack == "flurry" and prepared_class_attacker == unit:
-			button_text = "Rajada: alvo?"
+		if prepared_class_attacker == unit and (prepared_class_attack.begins_with("monk_") or prepared_class_attack.begins_with("warlock_")):
+			button_text = "Escolha o alvo"
 			button_disabled = true
 	
 	combat_action_panel_controller.configure_class_skill_button(
@@ -4392,6 +5446,8 @@ func check_hidden_rogue_perception(rogue: Node2D) -> void:
 		hide_bonus += 4 + int(hero.feat_hide_bonus)
 	else:
 		hide_bonus += int(rogue.hide_bonus)
+		if rogue.feats.has("Passos de Veludo"):
+			hide_bonus += 2
 
 	for enemy_unit in enemies:
 		if not is_instance_valid(enemy_unit) or enemy_unit.hp <= 0 or not enemy_unit.visible:
@@ -4489,6 +5545,8 @@ func open_spell_menu() -> void:
 		print(
 			"Não é possível abrir magias: herói inválido."
 		)
+		return
+	if not LevelUpManager.new().is_spellcasting_class(hero.character_class):
 		return
 	
 	print("====================================")
@@ -6097,20 +7155,6 @@ func get_max_spell_level_available() -> int:
 			return 2
 		return 1
 	
-	if hero.character_class == "Paladino":
-		if hero.level >= 7:
-			return 2
-		if hero.level >= 4:
-			return 1
-		return -1
-	
-	if hero.character_class == "Ranger":
-		if hero.level >= 7:
-			return 2
-		if hero.level >= 4:
-			return 1
-		return -1
-	
 	return -1
 func hero_has_animal_companion() -> bool:
 	if not is_instance_valid(hero):
@@ -6540,6 +7584,7 @@ func animal_companion_attack() -> void:
 		attack_bonus += int(
 			hero.feat_animal_companion_attack_bonus
 		)
+	attack_bonus += get_bard_song_attack_bonus(animal_companion)
 	
 	var high_ground_bonus: int = (
 		get_high_ground_attack_bonus_for_unit(
@@ -7961,7 +9006,9 @@ func update_active_effects_panel() -> void:
 		enemies,
 		safe_current_enemy,
 		safe_hero,
-		battle_turn_count
+		battle_turn_count,
+		npcs,
+		maxi(0, bard_song_end_round - battle_turn_count + 1)
 	)
 
 func get_enemy_target_unit() -> Node2D:
@@ -8176,6 +9223,8 @@ func get_unit_initiative_bonus(unit: Node2D) -> int:
 		bonus += int(unit.initiative_bonus)
 	if unit == hero:
 		bonus += int(hero.feat_initiative_bonus)
+	elif is_npc_unit(unit) and get_unit_class_name(unit) == "Ladino" and unit.feats.has("Ritmo de Emboscada"):
+		bonus += 1
 	
 	return bonus
 func roll_initiative_for_unit(unit: Node2D) -> Dictionary:
@@ -9040,12 +10089,7 @@ func show_attack_area_for_unit(
 	
 	var attack_range: float = 1.5
 	
-	if unit.has_method(
-		"get_weapon_range_meters"
-	):
-		attack_range = float(
-			unit.get_weapon_range_meters()
-		)
+	attack_range = get_prepared_power_range(unit)
 	
 	if attack_range <= 0.0:
 		return
@@ -9118,8 +10162,7 @@ func get_valid_attack_target_for_unit(attacker: Node2D, preferred_target: Node2D
 	
 	var attack_range: float = 1.5
 	
-	if attacker.has_method("get_weapon_range_meters"):
-		attack_range = float(attacker.get_weapon_range_meters())
+	attack_range = get_prepared_power_range(attacker)
 	
 	if is_instance_valid(preferred_target):
 		if preferred_target.hp > 0 and preferred_target.visible:
@@ -11515,6 +12558,7 @@ func npc_ai_attack_target(
 			npc_unit
 		)
 	)
+	attack_bonus += get_bard_song_attack_bonus(npc_unit)
 	
 	attack_bonus += (
 		get_high_ground_attack_bonus_for_unit(
@@ -11830,8 +12874,14 @@ func attack_selected_player_unit():
 	if not is_instance_valid(acting_unit):
 		return
 
-	if prepared_class_attack == "flurry" and prepared_class_attacker == acting_unit:
+	if prepared_class_attack in ["flurry", "monk_focused_strike", "monk_flurry", "monk_inner_force"] and prepared_class_attacker == acting_unit:
 		await perform_flurry_attack(acting_unit)
+		return
+	if prepared_class_attack.begins_with("warlock_") and prepared_class_attacker == acting_unit:
+		await perform_warlock_power_attack(acting_unit)
+		return
+	if ClassPowerProgressionData.is_progression_power(prepared_class_attack) and prepared_class_attacker == acting_unit:
+		await perform_progression_power_attack(acting_unit)
 		return
 	
 	if acting_unit == hero:
@@ -11855,6 +12905,27 @@ func npc_controlled_attack(
 	
 	if not is_instance_valid(enemy):
 		return
+	var barbarian_power_bonus: int = get_prepared_barbarian_damage_bonus(npc_unit)
+	if barbarian_power_bonus > 0 and not consume_prepared_barbarian_power(npc_unit):
+		clear_prepared_class_attack()
+		return
+	var paladin_power_prepared: bool = is_prepared_paladin_power(npc_unit)
+	if paladin_power_prepared and not consume_prepared_paladin_power(npc_unit):
+		clear_prepared_class_attack()
+		return
+	var rogue_power_prepared: bool = is_prepared_rogue_power(npc_unit)
+	if rogue_power_prepared and not consume_prepared_rogue_power(npc_unit):
+		clear_prepared_class_attack()
+		return
+	var ranger_power_prepared: bool = is_prepared_ranger_power(npc_unit)
+	if ranger_power_prepared and not consume_prepared_ranger_power(npc_unit):
+		clear_prepared_class_attack()
+		return
+	var bard_power_prepared: bool = is_prepared_bard_power(npc_unit)
+	var fighter_power_prepared: bool = is_prepared_fighter_power(npc_unit)
+	if fighter_power_prepared and not consume_prepared_fighter_power(npc_unit):
+		clear_prepared_class_attack()
+		return
 
 	if npc_unit.character_class == "Ladino" and npc_unit.is_hidden:
 		check_hidden_rogue_perception(npc_unit)
@@ -11870,6 +12941,14 @@ func npc_controlled_attack(
 			npc_unit
 		)
 	)
+	attack_bonus += get_prepared_paladin_attack_bonus(npc_unit)
+	attack_bonus += get_prepared_rogue_attack_bonus(npc_unit)
+	attack_bonus += get_prepared_ranger_attack_bonus(npc_unit)
+	attack_bonus += get_prepared_bard_attack_bonus(npc_unit)
+	attack_bonus += get_prepared_fighter_attack_bonus(npc_unit)
+	attack_bonus += get_bard_song_attack_bonus(npc_unit)
+	if npc_unit.character_class == "Ladino" and npc_unit.feats.has("Olho para Brechas") and is_target_flanked_by_ally(enemy, npc_unit):
+		attack_bonus += 1
 	
 	attack_bonus += (
 		get_high_ground_attack_bonus_for_unit(
@@ -11938,13 +13017,25 @@ func npc_controlled_attack(
 				npc_unit
 			)
 		)
+		damage += barbarian_power_bonus
+		damage += get_prepared_paladin_damage_bonus(npc_unit)
+		damage += get_prepared_rogue_damage_bonus(npc_unit)
+		damage += get_prepared_ranger_damage_bonus(npc_unit)
+		damage += get_prepared_fighter_damage_bonus(npc_unit)
+		if npc_unit.character_class == "Ladino":
+			if npc_unit.is_hidden and npc_unit.feats.has("Lâmina Discreta"):
+				damage += 2
+			if npc_unit.feats.has("Finta Persistente") and is_target_flanked_by_ally(enemy, npc_unit):
+				damage += 2
 		if npc_unit.race == "Halfling" and is_target_flanked_by_ally(enemy, npc_unit):
 			damage += 1
 
 		if using_smite:
 			damage += npc_unit.level
+			if npc_unit.feats.has("Justiça Ardente"):
+				damage += 2
 
-		if npc_unit.character_class == "Ladino" and npc_unit.is_hidden:
+		if npc_unit.character_class == "Ladino" and (npc_unit.is_hidden or is_target_flanked_by_ally(enemy, npc_unit)):
 			var sneak_damage: int = npc_unit.get_sneak_attack_damage()
 			damage += sneak_damage
 			show_floating_text_on_unit(enemy, "FURTIVO +%d" % sneak_damage, 22, "critical")
@@ -11980,6 +13071,18 @@ func npc_controlled_attack(
 
 	if using_smite:
 		npc_unit.consume_smite_evil()
+		clear_prepared_class_attack()
+	elif barbarian_power_bonus > 0:
+		clear_prepared_class_attack()
+	elif paladin_power_prepared:
+		clear_prepared_class_attack()
+	elif rogue_power_prepared:
+		clear_prepared_class_attack()
+	elif ranger_power_prepared:
+		clear_prepared_class_attack()
+	elif bard_power_prepared:
+		clear_prepared_class_attack()
+	elif fighter_power_prepared:
 		clear_prepared_class_attack()
 	
 	await finish_player_attack(
@@ -12161,11 +13264,12 @@ func end_active_unit_turn() -> void:
 		get_unit_display_name(unit)
 	)
 	
-	if unit == hero:
-		if unit.has_method("update_rage_turn"):
-			unit.update_rage_turn(
-				battle_turn_count
-			)
+	if unit.has_method("update_rage_turn"):
+		unit.update_rage_turn(
+			battle_turn_count
+		)
+	if unit.has_method("update_druid_form_turn"):
+		unit.update_druid_form_turn(battle_turn_count)
 	
 	if unit.has_method(
 		"update_temporary_effects_turn"
@@ -12408,10 +13512,7 @@ func prepare_player_attack_target(
 	
 	var attack_range: float = 1.5
 	
-	if attacker.has_method("get_weapon_range_meters"):
-		attack_range = float(
-			attacker.get_weapon_range_meters()
-		)
+	attack_range = get_prepared_power_range(attacker)
 	
 	var distance: float = get_distance_in_meters(
 		attacker.grid_position,
@@ -12817,6 +13918,7 @@ func load_saved_player_presets_into_game_state() -> void:
 			GameState.hero_max_level
 		)
 	)
+	GameState.hero_max_level = maxi(30, GameState.hero_max_level)
 	
 	# =====================================================
 	# RECURSOS PRINCIPAIS
@@ -13021,6 +14123,7 @@ func load_saved_player_presets_into_game_state() -> void:
 			GameState.hero_feats
 		)
 	).duplicate(true)
+	GameState.hero_class_power_choices = (loaded_player_presets.get("hero_class_power_choices", {})).duplicate(true)
 	
 	# =====================================================
 	# EQUIPAMENTO E OURO
@@ -13059,6 +14162,30 @@ func load_saved_player_presets_into_game_state() -> void:
 			GameState.hero_animal_companion_type
 		)
 	)
+func migrate_arcane_class_progression() -> void:
+	if GameState.player_class not in ["Mago", "Feiticeiro"]:
+		return
+	var new_hit_die: int = 6 if GameState.player_class == "Mago" else 8
+	var new_fixed_hp: int = 4 if GameState.player_class == "Mago" else 5
+	var old_hit_die: int = GameState.hero_class_hit_die
+	var old_fixed_hp: int = GameState.hero_hp_fixed_per_level
+	if old_hit_die == new_hit_die and old_fixed_hp == new_fixed_hp:
+		return
+	# Não é possível reconstruir sorteios antigos; conserva-se a vida rolada.
+	if GameState.hero_hp_progression_mode == "fixed":
+		var hp_difference: int = (new_hit_die - old_hit_die) + maxi(0, GameState.hero_level - 1) * (new_fixed_hp - old_fixed_hp)
+		GameState.hero_max_hp = maxi(1, GameState.hero_max_hp + hp_difference)
+	GameState.hero_class_hit_die = new_hit_die
+	GameState.hero_hp_fixed_per_level = new_fixed_hp
+	var creation: Control = CharacterCreationScript.new()
+	GameState.hero_class_features = creation.class_presets[GameState.player_class]["features"].duplicate(true)
+	creation.free()
+	loaded_player_presets["hero_max_hp"] = GameState.hero_max_hp
+	loaded_player_presets["hero_class_hit_die"] = new_hit_die
+	loaded_player_presets["hero_hp_fixed_per_level"] = new_fixed_hp
+	loaded_player_presets["hero_class_features"] = GameState.hero_class_features.duplicate(true)
+
+
 func configure_hero_from_game_state() -> void:
 	if not is_instance_valid(hero):
 		return
@@ -13067,6 +14194,7 @@ func configure_hero_from_game_state() -> void:
 	
 	hero.character_name = GameState.player_name
 	hero.character_class = GameState.player_class
+	hero.selected_class_powers = GameState.hero_class_power_choices.duplicate(true)
 	hero.character_race = GameState.player_race
 	
 	hero.level = GameState.hero_level
@@ -13074,7 +14202,7 @@ func configure_hero_from_game_state() -> void:
 	hero.xp_to_next_level = (
 		GameState.hero_xp_to_next_level
 	)
-	hero.max_level = GameState.hero_max_level
+	hero.max_level = maxi(30, GameState.hero_max_level)
 	
 	hero.strength = GameState.hero_strength
 	hero.dexterity = GameState.hero_dexterity
@@ -13094,6 +14222,7 @@ func configure_hero_from_game_state() -> void:
 	hero.favored_class = (
 		GameState.hero_favored_class
 	)
+	migrate_arcane_class_progression()
 	hero.race_traits = (
 		GameState.hero_race_traits.duplicate(true)
 	)
@@ -13156,7 +14285,7 @@ func configure_hero_from_game_state() -> void:
 		hero.setup_feats(
 			GameState.hero_feats
 		)
-		if not GameState.should_load_save:
+		if not GameState.should_load_save and LevelUpManager.new().is_spellcasting_class(hero.character_class):
 			hero.max_spell_slots_level_1 += int(hero.feat_extra_spell_slot_level_1)
 			hero.spell_slots_level_1 += int(hero.feat_extra_spell_slot_level_1)
 	
@@ -13215,7 +14344,8 @@ func configure_hero_from_game_state() -> void:
 	# MAGIAS
 	# =====================================================
 	var has_saved_spell_state: bool = (
-		not GameState.hero_known_spells.is_empty()
+		LevelUpManager.new().is_spellcasting_class(hero.character_class)
+		and not GameState.hero_known_spells.is_empty()
 	)
 	
 	if hero.has_method("setup_class_spells"):
@@ -15667,6 +16797,10 @@ func play_scenario_victory_sequence() -> bool:
 		"Sr Uiliam",
 		false
 	)
+	var recruited_uiliam: Node2D = find_scenario_npc_by_id("Sr Uiliam")
+	if is_instance_valid(recruited_uiliam):
+		for power_id in recruited_uiliam.daily_powers_used:
+			PartyManager.consume_daily_power("Sr Uiliam", str(power_id))
 
 	current_stage += 1
 	GameState.selected_stage = current_stage
@@ -15808,7 +16942,7 @@ func get_spell_save_dc(
 				"save_dc",
 				12
 			)
-		) + (1 if is_instance_valid(hero) and hero.character_race == "Elfo" else 0)
+		) + (1 if is_instance_valid(hero) and hero.character_race == "Elfo" else 0) + (int(hero.feat_spell_save_dc_bonus) if is_instance_valid(hero) else 0)
 	
 	var spell_level: int = int(
 		spell_data.get(
@@ -15822,7 +16956,7 @@ func get_spell_save_dc(
 		10
 		+ spell_level
 		+ get_hero_spellcasting_modifier()
-	) + (1 if is_instance_valid(hero) and hero.character_race == "Elfo" else 0)
+	) + (1 if is_instance_valid(hero) and hero.character_race == "Elfo" else 0) + (int(hero.feat_spell_save_dc_bonus) if is_instance_valid(hero) else 0)
 func get_unit_spell_save_bonus(
 	target_unit: Node2D,
 	save_type: String

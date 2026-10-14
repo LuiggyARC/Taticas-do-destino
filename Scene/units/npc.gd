@@ -77,6 +77,16 @@ var hide_bonus: int = 0
 var sneak_attack_dice_count: int = 0
 var smite_evil_used: bool = false
 var smite_evil_active: bool = false
+var daily_powers_used: Array = []
+var encounter_powers_used: Array = []
+var druid_guard_active: bool = false
+var cleric_guard_active: bool = false
+var fighter_guard_active: bool = false
+var druid_form_active: bool = false
+var druid_form_end_turn: int = 0
+var is_raging: bool = false
+var rage_uses_this_battle: int = 0
+var rage_end_turn: int = 0
 
 var health_bar_background: ColorRect
 var health_bar_fill: ColorRect
@@ -186,6 +196,7 @@ func setup_from_npc_data(
 			""
 		)
 	)
+	daily_powers_used = npc_data.get("daily_powers_used", []).duplicate()
 
 	hide_bonus = int(npc_data.get("hide_bonus", 0))
 
@@ -542,6 +553,9 @@ func update_world_position():
 func reset_movement():
 	if unstoppable_active:
 		unstoppable_turn_started = true
+	druid_guard_active = false
+	cleric_guard_active = false
+	fighter_guard_active = false
 	current_movement_meters = max_movement_meters
 	has_attacked = false
 	has_opportunity_attacked = false
@@ -645,6 +659,15 @@ func get_armor_class() -> int:
 	return (
 		armor_class
 		+ temporary_armor_class_bonus
+		+ (1 if character_class == "Paladino" and feats.has("Defesa Juramentada") else 0)
+		+ (1 if character_class == "Ladino" and feats.has("Guarda Esquiva") else 0)
+		+ (1 + (1 if feats.has("Casca Espessa") else 0) if character_class == "Druida" and druid_guard_active else 0)
+		+ (1 if character_class == "Clérigo" and cleric_guard_active else 0)
+		+ (2 if character_class == "Guerreiro" and fighter_guard_active else 0)
+		+ (1 if character_class == "Guerreiro" and feats.has("Armadura de Campanha") else 0)
+		+ (1 if character_class == "Bruxo" and feats.has("Escudo Oculto") else 0)
+		+ (1 if character_class == "Monge" and equipped_armor in ["Nenhuma", "none", ""] and feats.has("Corpo Disciplinado") else 0)
+		+ (1 if character_class == "Druida" and druid_form_active else 0)
 	)
 
 
@@ -682,6 +705,16 @@ func roll_total_weapon_damage() -> int:
 	total_damage += damage_bonus
 	total_damage += feat_damage_bonus
 	total_damage += temporary_damage_bonus
+	if character_class == "Druida" and weapon_type == "melee":
+		total_damage += get_druid_form_damage_bonus()
+	if character_class == "Bárbaro" and is_raging:
+		total_damage += 2
+		if feats.has("Sangue Ardente") or feats.has("Fúria Poderosa"):
+			total_damage += 2
+	if character_class == "Guerreiro" and weapon_type == "melee" and feats.has("Pancada de Ferro"):
+		total_damage += 2
+	if character_class == "Monge" and equipped_weapon in ["Soco", "unarmed"] and feats.has("Punhos Duros"):
+		total_damage += 2
 	if race == "Meio-Orc" and unstoppable_active:
 		total_damage += 2
 	
@@ -816,15 +849,15 @@ func get_flat_footed_armor_class() -> int:
 
 
 func get_fortitude_save_bonus() -> int:
-	return fortitude_bonus + (1 if race == "Gnomo" or (race == "Meio-Orc" and unstoppable_active) else 0)
+	return fortitude_bonus + (1 if race == "Gnomo" or (race == "Meio-Orc" and unstoppable_active) else 0) + (1 if character_class == "Guerreiro" and feats.has("Reflexo de Guarda") else 0)
 
 
 func get_reflex_save_bonus() -> int:
-	return reflex_bonus + (1 if race == "Gnomo" or (race == "Meio-Orc" and unstoppable_active) else 0)
+	return reflex_bonus + (1 if race == "Gnomo" or (race == "Meio-Orc" and unstoppable_active) else 0) + (1 if character_class == "Guerreiro" and feats.has("Reflexo de Guarda") else 0)
 
 
 func get_will_save_bonus() -> int:
-	return will_bonus + (1 if race == "Gnomo" or (race == "Meio-Orc" and unstoppable_active) else 0)
+	return will_bonus + (1 if race == "Gnomo" or (race == "Meio-Orc" and unstoppable_active) else 0) + (1 if character_class == "Bruxo" and feats.has("Vontade do Pacto") else 0) + (1 if character_class == "Monge" and feats.has("Mente Serena") else 0)
 
 
 func get_weapon_focus_attack_bonus() -> int:
@@ -846,8 +879,76 @@ func get_total_attack_bonus() -> int:
 	
 	total += feat_attack_bonus
 	total += get_weapon_focus_attack_bonus()
+	if character_class == "Paladino" and weapon_type == "melee" and feats.has("Lâmina da Ordem"):
+		total += 1
+	if character_class == "Guerreiro":
+		if weapon_type == "melee" and feats.has("Lâmina Disciplinada"):
+			total += 1
+		if weapon_type == "ranged" and feats.has("Tiro Disciplinado"):
+			total += 1
+	if character_class == "Bardo" and feats.has("Dueto Preciso"):
+		total += 1
+	if character_class == "Monge" and weapon_type == "melee" and feats.has("Punho Centrado"):
+		total += 1
+	if character_class == "Bárbaro" and is_raging:
+		total += 1
 	
 	return total
+
+
+func can_use_rage() -> bool:
+	var extra_uses: int = 1 if feats.has("Fôlego da Fúria") or feats.has("Fúria Extra") else 0
+	return character_class == "Bárbaro" and not is_raging and rage_uses_this_battle < 1 + extra_uses
+
+
+func activate_druid_form(current_battle_turn: int) -> void:
+	if character_class != "Druida" or druid_form_active:
+		return
+	druid_form_active = true
+	druid_form_end_turn = current_battle_turn + 3
+
+
+func update_druid_form_turn(current_battle_turn: int) -> void:
+	if druid_form_active and current_battle_turn >= druid_form_end_turn:
+		end_druid_form()
+
+
+func end_druid_form() -> void:
+	druid_form_active = false
+	druid_form_end_turn = 0
+
+
+func get_druid_form_damage_bonus() -> int:
+	if character_class != "Druida" or not druid_form_active:
+		return 0
+	return 2 + (1 if feats.has("Garras da Mata") else 0)
+
+
+func activate_rage(current_battle_turn: int) -> void:
+	if not can_use_rage():
+		return
+	is_raging = true
+	rage_uses_this_battle += 1
+	rage_end_turn = current_battle_turn + maxi(1, 3 + get_constitution_modifier())
+	armor_class -= 2
+	var extra_hp: int = 2 * level
+	max_hp += extra_hp
+	hp += extra_hp
+
+
+func update_rage_turn(current_battle_turn: int) -> void:
+	if is_raging and current_battle_turn >= rage_end_turn:
+		end_rage()
+
+
+func end_rage() -> void:
+	if not is_raging:
+		return
+	is_raging = false
+	rage_end_turn = 0
+	armor_class += 2
+	max_hp = maxi(1, max_hp - 2 * level)
+	hp = clampi(hp, 0, max_hp)
 
 func create_health_bar():
 	# =====================================================

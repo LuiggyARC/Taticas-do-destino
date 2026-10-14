@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scene/tests/character_creation_attributes_test.gd" id="1_test"]
+
+[node name="CharacterCreationAttributesTest" type="Node"]
+script = ExtResource("1_test")

@@ -254,14 +254,14 @@ static func get_sr_uiliam() -> Dictionary:
 		"observe_bonus": 3,
 		
 		"feats": [
-			"Vitalidade",
-			"Foco em Arma - Espada Longa"
+			"Lâmina da Ordem",
+			"Defesa Juramentada"
 		],
 		
 		"feat_attack_bonus": 0,
 		"feat_damage_bonus": 0,
-		"weapon_focus_name": "Espada Longa",
-		"weapon_focus_attack_bonus": 1,
+		"weapon_focus_name": "",
+		"weapon_focus_attack_bonus": 0,
 		
 		"ai_behavior": "defensive",
 		
@@ -349,7 +349,7 @@ static func get_aniri() -> Dictionary:
 		"will_bonus": 1,
 
 		"observe_bonus": 4,
-		"hide_bonus": 4,
+		"hide_bonus": 2,
 
 		"skills": {
 			"observe": 4,
@@ -357,15 +357,15 @@ static func get_aniri() -> Dictionary:
 		},
 
 		"feats": [
-			"Furtividade Aprimorada",
-			"Foco em Arma: Espada Curta"
+			"Passos de Veludo",
+			"Olho para Brechas"
 		],
 
 		"feat_attack_bonus": 0,
 		"feat_damage_bonus": 0,
 
 		"weapon_focus_name": "Espada Curta",
-		"weapon_focus_attack_bonus": 1,
+		"weapon_focus_attack_bonus": 0,
 
 		"race_traits": [
 			"+2 Destreza ou Sabedoria (Destreza escolhida)",
@@ -373,22 +373,20 @@ static func get_aniri() -> Dictionary:
 		],
 
 		"class_features": [
-			"Dado de Vida d6",
-			"BBA médio",
-			"Reflexos bons",
+			"Dado de Vida d8; vida fixa +5 por nível",
+			"Ataque com armas médio; Reflexos fortes",
 			"Ataque Furtivo +2d6",
-			"Encontrar Armadilhas",
-			"Evasão",
-			"Sentir Armadilhas +1",
-			"Maior quantidade de pontos de perícia"
+			"Passo Oculto (sem limite)",
+			"Brecha Calculada (por encontro)",
+			"Corte Decisivo (diário)"
 		],
 
 		"features": [
 			"Tamanho Pequeno",
 			"Ataque Furtivo +2d6",
-			"Encontrar Armadilhas",
-			"Evasão",
-			"Sentir Armadilhas +1"
+			"Passo Oculto (sem limite)",
+			"Brecha Calculada (por encontro)",
+			"Corte Decisivo (diário)"
 		],
 
 		"sneak_attack_dice": 2,
@@ -460,16 +458,15 @@ static func get_kasum() -> Dictionary:
 			"hide": 0
 		},
 		"feats": [
-			"Foco em Arma: Machado de Batalha",
-			"Golpe Brutal",
-			"Ataque Poderoso"
+			"Precisão Selvagem",
+			"Força Implacável",
+			"Golpe Pesado"
 		],
-		# Ataque Poderoso: -1 no ataque, +2 no dano.
-		# Golpe Brutal: +2 no dano corpo a corpo.
-		"feat_attack_bonus": -1,
+		# Mantém o resultado anterior: +1 e -1 para acertar, +4 dano.
+		"feat_attack_bonus": 0,
 		"feat_damage_bonus": 4,
-		"weapon_focus_name": "Machado de Batalha",
-		"weapon_focus_attack_bonus": 1,
+		"weapon_focus_name": "",
+		"weapon_focus_attack_bonus": 0,
 		"race_traits": [
 			"Rápida Aprendizagem: +2 em um atributo à escolha (já incluído na ficha)",
 			"1 talento inicial extra"
