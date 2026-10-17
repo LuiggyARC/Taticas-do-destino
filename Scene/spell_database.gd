@@ -31,18 +31,69 @@ var spells := {
 		"flat_bonus": 1
 	},
 
-	"Som Fantasma": {
+	"Pulso Sonoro": {
 		"level": 0,
-		"classes": ["Bardo", "Mago", "Feiticeiro"],
-		"description": "Cria um som ilusório em uma área.",
-		"effect": "utility",
-		"spell_type": "utility",
-		"type": "utility",
-		"target": "area",
+		"classes": ["Bardo", "Feiticeiro"],
+		"description": "Uma onda sonora causa 1d4 de dano aos inimigos próximos ao alvo.",
+		"effect": "damage",
+		"spell_type": "damage",
+		"type": "damage",
+		"target": "enemy",
+		"is_area": true,
 		"range_meters": 9.0,
-		"area_radius": 2,
-		"utility_effect": "sound",
+		"area_radius": 1,
+		"value_dice": 4,
+		"value_dice_count": 1,
+		"flat_bonus": 0
+	},
+
+	"Selo de Lentidão": {
+		"level": 0,
+		"classes": ["Mago"],
+		"description": "Reduz em 3 m o movimento de um inimigo por 2 turnos.",
+		"effect": "control",
+		"spell_type": "control",
+		"type": "control",
+		"target": "enemy",
+		"range_meters": 9.0,
+		"area_radius": 0,
+		"attack_penalty": 0,
+		"armor_penalty": 0,
+		"movement_penalty": 3.0,
 		"duration": 2
+	},
+
+	"Prisão Arcana": {
+		"level": 1,
+		"classes": ["Mago"],
+		"description": "Limita o movimento de um inimigo em 4,5 m e reduz sua CA em 1 por 2 turnos.",
+		"effect": "control",
+		"spell_type": "control",
+		"type": "control",
+		"target": "enemy",
+		"range_meters": 12.0,
+		"area_radius": 0,
+		"attack_penalty": 0,
+		"armor_penalty": 1,
+		"movement_penalty": 4.5,
+		"duration": 2
+	},
+
+	"Explosão de Brasas": {
+		"level": 1,
+		"classes": ["Feiticeiro"],
+		"description": "Explode em uma pequena área e causa 2d4 de dano de fogo. Recebe o bônus de dano do Feiticeiro.",
+		"visual_kind": "fire",
+		"effect": "damage",
+		"spell_type": "damage",
+		"type": "damage",
+		"target": "enemy",
+		"is_area": true,
+		"range_meters": 9.0,
+		"area_radius": 1,
+		"value_dice": 4,
+		"value_dice_count": 2,
+		"flat_bonus": 0
 	},
 
 	"Inspirar Coragem": {

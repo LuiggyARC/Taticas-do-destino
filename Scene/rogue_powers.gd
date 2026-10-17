@@ -1,14 +1,7 @@
 extends RefCounted
 
-# Técnicas originais de Aviant. Esconder-se e Ataque Furtivo continuam
-# seguindo as regras de combate já existentes.
+# Técnicas originais de Aviant. Esconder-se é uma ação própria no painel.
 const POWERS := [
-	{
-		"id": "rogue_hide",
-		"name": "Passo Oculto",
-		"frequency": "Sem limite",
-		"description": "Esconda-se uma vez por turno antes de atacar. A percepção dos inimigos ainda pode revelar você."
-	},
 	{
 		"id": "rogue_precise_strike",
 		"name": "Brecha Calculada",

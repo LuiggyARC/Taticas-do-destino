@@ -334,8 +334,8 @@ var monsters: Dictionary = {
 		"subtype": "",
 		"size": "Pequeno",
 		
-		"max_hp": 16,
-		"hp": 16,
+		"max_hp": 14,
+		"hp": 14,
 		"initiative_bonus": 3,
 		"max_movement_meters": 12.0,
 		
@@ -488,8 +488,8 @@ var monsters: Dictionary = {
 		"subtype": "",
 		"size": "Médio",
 		
-		"max_hp": 13,
-		"hp": 13,
+		"max_hp": 12,
+		"hp": 12,
 		"initiative_bonus": 2,
 		"max_movement_meters": 12.0,
 		
@@ -553,8 +553,8 @@ var monsters: Dictionary = {
 		"subtype": "",
 		"size": "Médio",
 		
-		"max_hp": 15,
-		"hp": 15,
+		"max_hp": 13,
+		"hp": 13,
 		"initiative_bonus": 2,
 		"max_movement_meters": 9.0,
 		
@@ -567,13 +567,13 @@ var monsters: Dictionary = {
 		"weapon_type": "melee",
 		"damage_dice": 3,
 		"damage_dice_count": 1,
-		"damage_bonus": 4,
+		"damage_bonus": 2,
 		"weapon_range_meters": 1.5,
 		
 		"equipped_armor": "Placas de Couro",
 		"equipped_shield": "",
 		
-		"strength": 17,
+		"strength": 15,
 		"dexterity": 15,
 		"constitution": 15,
 		"intelligence": 6,
@@ -712,7 +712,7 @@ var monsters: Dictionary = {
 		"weapon_type": "melee",
 		"damage_dice": 3,
 		"damage_dice_count": 1,
-		"damage_bonus": 3,
+		"damage_bonus": 2,
 		"weapon_range_meters": 1.5,
 		
 		"equipped_armor": "",

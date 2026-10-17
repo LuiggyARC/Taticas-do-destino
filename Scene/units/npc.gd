@@ -198,7 +198,7 @@ func setup_from_npc_data(
 	)
 	daily_powers_used = npc_data.get("daily_powers_used", []).duplicate()
 
-	hide_bonus = int(npc_data.get("hide_bonus", 0))
+	hide_bonus = int(npc_data.get("skills", {}).get("hide", npc_data.get("hide_bonus", 0)))
 
 	level = int(
 		npc_data.get(
@@ -645,7 +645,11 @@ func die():
 	
 	print(display_name, " foi derrotado.")
 	
-	visible = false
+	set_hidden_state(false)
+	has_attacked = true
+	current_movement_meters = 0.0
+	modulate = Color(0.55, 0.55, 0.55, 1.0)
+	update_health_bar()
 	set_process(false)
 	
 	died.emit(self)
@@ -1003,7 +1007,7 @@ func update_health_bar():
 	# NOME
 	# =====================================================
 	if is_instance_valid(health_name_label):
-		health_name_label.text = display_name
+		health_name_label.text = display_name + (" (0 PV)" if hp <= 0 else "")
 	
 	# =====================================================
 	# VIDA

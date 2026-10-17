@@ -376,3 +376,7 @@ func flash_unit(
 		original_modulate,
 		duration / 2.0
 	)
+	tween.tween_callback(func() -> void:
+		if is_instance_valid(unit) and "hp" in unit and unit.hp <= 0:
+			unit.modulate = Color(0.55, 0.55, 0.55, 1.0)
+	)

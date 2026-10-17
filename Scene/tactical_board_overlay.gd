@@ -84,7 +84,8 @@ func create_movement_tile(
 
 
 func show_path_preview(
-	path: Array[Vector2i]
+	path: Array[Vector2i],
+	opportunity_risk: bool = false
 ) -> void:
 	if not is_instance_valid(movement_layer):
 		return
@@ -100,8 +101,30 @@ func show_path_preview(
 			Color(1.0, 0.87, 0.18, 0.90),
 			20
 		)
-		
+		tile.set_meta("path_preview", true)
 		movement_layer.add_child(tile)
+	if path.is_empty():
+		return
+	var destination_tile: Panel = BattleTileStyle.create_tile(
+		"SelectedDestinationTile",
+		path[-1],
+		tile_size,
+		Color(1.0, 0.37, 0.08, 0.64) if opportunity_risk else Color(0.12, 0.86, 0.76, 0.58),
+		Color(1.0, 0.68, 0.20) if opportunity_risk else Color(0.64, 1.0, 0.88),
+		25
+	)
+	destination_tile.set_meta("path_preview", true)
+	var marker := Label.new()
+	marker.text = "!" if opportunity_risk else "✓"
+	marker.position = Vector2.ZERO
+	marker.size = destination_tile.size
+	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	marker.add_theme_font_size_override("font_size", maxi(22, roundi(float(tile_size) * 0.5)))
+	marker.add_theme_color_override("font_color", Color.WHITE)
+	destination_tile.add_child(marker)
+	movement_layer.add_child(destination_tile)
 
 
 func clear_path_preview() -> void:
@@ -109,7 +132,8 @@ func clear_path_preview() -> void:
 		return
 	
 	for child in movement_layer.get_children():
-		if child.name == "PathPreviewTile":
+		if child.get_meta("path_preview", false):
+			movement_layer.remove_child(child)
 			child.queue_free()
 
 

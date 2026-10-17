@@ -282,6 +282,7 @@ func is_narration_speaker(speaker_name: String) -> bool:
 func is_system_notice_speaker(speaker_name: String) -> bool:
 	return speaker_name.strip_edges().to_lower() in [
 		"missão iniciada", "missão concluída", "missão atualizada",
+		"diário atualizado",
 		"nova missão", "nova missão pessoal", "nova missão de companheiro",
 		"novo objetivo", "próximo objetivo", "objetivo atualizado",
 		"novo companheiro", "recompensa", "loja atualizada",
@@ -368,6 +369,12 @@ func get_speaker_portrait_path(
 	
 	if normalized_speaker.contains("aniri"):
 		return "res://Assets/Characters/AniriLadina.png"
+
+	if normalized_speaker.contains("litz"):
+		return "res://Assets/Characters/Litz.png"
+
+	if normalized_speaker.contains("arievilo"):
+		return "res://Assets/Maps/Arievilo.png"
 	
 	if normalized_speaker.contains("hashagur"):
 		return "res://Assets/Characters/Hashagur.png"
@@ -612,9 +619,12 @@ func show_dialog(
 	var available_size: Vector2i = Vector2i(scene_tree.root.get_visible_rect().size) - Vector2i(24, 24)
 	var desired_size: Vector2i = story_dialog_size
 	if cinematic_mode:
+		var cinematic_width: int = mini(900, int(float(available_size.x) * 0.63))
+		if OS.has_feature("mobile"):
+			cinematic_width = mini(1500, int(float(available_size.x) * 0.60))
 		desired_size = Vector2i(
-			mini(900, int(float(available_size.x) * 0.63)),
-			360 if OS.has_feature("mobile") else 290
+			cinematic_width,
+			390 if OS.has_feature("mobile") else 290
 		)
 	popup_centered(
 		Vector2i(

@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+SceneTransition="*res://Scene/scene_transition.gd"
 GameState="*uid://bqu34sey7lmuf"
 MusicManage="*uid://bebkv68nymxc8"
 UIAudioManager="*uid://4p3llwujii8l"

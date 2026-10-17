@@ -19,7 +19,7 @@ const DEVELOPMENT_MESSAGE := (
 	+ "Mesmo assim, a sorte nos dados pode tornar cada batalha mais fácil ou mais difícil.\n"
 	+ "Afinal, tudo depende do destino que os dados lhe reservam.\n"
 	+ "O jogo será totalmente dublado mas por enquanto apenas o inicio\n"
-	+ "Bem vindo a Taticas do Destino, Esta é a versão 7.0 de teste."
+	+ "Bem vindo a Taticas do Destino, Esta é a versão 8.5 de teste."
 )
 
 

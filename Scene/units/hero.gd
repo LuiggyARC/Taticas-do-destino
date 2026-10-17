@@ -226,6 +226,8 @@ func reset_movement():
 
 
 func take_damage(amount: int):
+	if hp <= 0:
+		return
 	var final_damage: int = amount
 	
 	if damage_reduction > 0:
@@ -264,7 +266,13 @@ func get_racial_damage_bonus() -> int:
 
 func die():
 	print("Herói derrotado.")
-	queue_free()
+	# A tela de derrota ainda precisa ler o herói e seus recursos.
+	# A cena será descartada ao retornar ao último save.
+	set_hidden_state(false)
+	has_attacked = true
+	current_movement_meters = 0.0
+	modulate = Color(0.55, 0.55, 0.55, 1.0)
+	update_health_bar()
 
 
 func apply_character_data(
@@ -486,6 +494,10 @@ func apply_level_up_result(
 			{}
 		)
 	)
+	var hp_before_level: int = hp
+	var slots_before_level_0: int = spell_slots_level_0
+	var slots_before_level_1: int = spell_slots_level_1
+	var slots_before_level_2: int = spell_slots_level_2
 	
 	# =====================================================
 	# NÍVEL
@@ -733,6 +745,11 @@ func apply_level_up_result(
 	# PROGRESSÕES DA CLASSE
 	# =====================================================
 	update_class_scaling()
+	# Evoluir aumenta os limites, mas não substitui uma noite de descanso.
+	hp = clampi(hp_before_level, 0, max_hp)
+	spell_slots_level_0 = clampi(slots_before_level_0, 0, max_spell_slots_level_0)
+	spell_slots_level_1 = clampi(slots_before_level_1, 0, max_spell_slots_level_1)
+	spell_slots_level_2 = clampi(slots_before_level_2, 0, max_spell_slots_level_2)
 	
 	# =====================================================
 	# EXPERIÊNCIA PENDENTE
@@ -1672,6 +1689,9 @@ func setup_class_spells(
 		var spell_name: String = str(
 			spell_name_value
 		)
+		# Saves anteriores podem conter a magia removida.
+		if spell_name == "Som Fantasma":
+			spell_name = "Selo de Lentidão" if character_class == "Mago" else "Pulso Sonoro"
 		
 		if spell_name == "":
 			continue
@@ -2183,7 +2203,7 @@ func update_health_bar():
 	# NOME
 	# =====================================================
 	if is_instance_valid(health_name_label):
-		health_name_label.text = character_name
+		health_name_label.text = character_name + (" (0 PV)" if hp <= 0 else "")
 	
 	# =====================================================
 	# VIDA

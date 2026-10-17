@@ -22,6 +22,7 @@ var companion_type: String = "Lobo"
 
 var max_hp: int = 18
 var hp: int = 18
+var defeat_emitted: bool = false
 var health_name_label: Label
 var health_bar_background: ColorRect
 var health_bar_fill: ColorRect
@@ -277,6 +278,8 @@ func reset_movement() -> void:
 func take_damage(
 	amount: int
 ) -> void:
+	if hp <= 0:
+		return
 	var safe_damage: int = max(
 		0,
 		amount
@@ -330,7 +333,7 @@ func heal(
 
 func update_health_display() -> void:
 	if is_instance_valid(health_name_label):
-		health_name_label.text = companion_name
+		health_name_label.text = companion_name + (" (0 PV)" if hp <= 0 else "")
 
 	if is_instance_valid(health_bar_fill):
 		var hp_ratio: float = 0.0
@@ -375,10 +378,14 @@ func create_health_bar() -> void:
 
 
 func die() -> void:
-	if not visible:
+	if defeat_emitted:
 		return
 	
-	visible = false
+	defeat_emitted = true
+	has_attacked = true
+	current_movement_meters = 0.0
+	modulate = Color(0.55, 0.55, 0.55, 1.0)
+	update_health_display()
 	
 	print(
 		companion_name,
@@ -386,11 +393,6 @@ func die() -> void:
 	)
 	
 	companion_defeated.emit()
-	
-	# O main pode ter colocado o nó na fila de exclusão
-	# ao receber companion_defeated.
-	if not is_queued_for_deletion():
-		queue_free()
 
 
 func is_alive() -> bool:

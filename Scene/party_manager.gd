@@ -113,11 +113,6 @@ func grant_xp_to_active_members(
 	excluded_member_id: String = "",
 	additional_member_ids: Array[String] = []
 ) -> Array[String]:
-	var rewarded_member_ids: Array[String] = []
-
-	if amount <= 0:
-		return rewarded_member_ids
-
 	var reward_candidates: Array[String] = []
 	for active_member_id in active_party:
 		if not reward_candidates.has(active_member_id):
@@ -125,9 +120,22 @@ func grant_xp_to_active_members(
 	for additional_member_id in additional_member_ids:
 		if not reward_candidates.has(additional_member_id):
 			reward_candidates.append(additional_member_id)
+	return grant_xp_to_selected_members(amount, reward_candidates, excluded_member_id)
 
-	for member_id in reward_candidates:
+
+func grant_xp_to_selected_members(
+	amount: int,
+	selected_member_ids: Array[String],
+	excluded_member_id: String = ""
+) -> Array[String]:
+	var rewarded_member_ids: Array[String] = []
+	if amount <= 0:
+		return rewarded_member_ids
+
+	for member_id in selected_member_ids:
 		if member_id == excluded_member_id:
+			continue
+		if rewarded_member_ids.has(member_id):
 			continue
 
 		if not members.has(member_id):

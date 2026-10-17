@@ -113,6 +113,9 @@ var control_attack_penalty: int = 0
 var control_armor_penalty: int = 0
 var control_movement_penalty: float = 0.0
 var control_effect_end_turn: int = 0
+var control_effect_name: String = ""
+var control_save_type: String = ""
+var control_save_dc: int = 0
 
 func _ready():
 	create_visual()
@@ -817,7 +820,10 @@ func apply_control_effect(
 	attack_penalty: int,
 	armor_penalty: int,
 	movement_penalty: float,
-	effect_end_turn: int
+	effect_end_turn: int,
+	effect_name: String = "",
+	save_type: String = "",
+	save_dc: int = 0
 ) -> void:
 	var previous_movement_penalty: float = (
 		control_movement_penalty
@@ -842,6 +848,10 @@ func apply_control_effect(
 		control_effect_end_turn,
 		effect_end_turn
 	)
+	if save_dc > 0:
+		control_effect_name = effect_name
+		control_save_type = save_type
+		control_save_dc = save_dc
 	
 	var additional_movement_penalty: float = max(
 		0.0,
@@ -868,6 +878,30 @@ func clear_control_effects() -> void:
 	control_armor_penalty = 0
 	control_movement_penalty = 0.0
 	control_effect_end_turn = 0
+	control_effect_name = ""
+	control_save_type = ""
+	control_save_dc = 0
+
+
+func resolve_control_end_of_turn(save_bonus: int, dice_roll: int = -1) -> Dictionary:
+	if control_save_dc <= 0:
+		return {}
+	if dice_roll < 1:
+		dice_roll = randi_range(1, 20)
+	var save_total: int = dice_roll + save_bonus
+	var resisted: bool = dice_roll == 20 or (dice_roll != 1 and save_total >= control_save_dc)
+	var result: Dictionary = {
+		"effect_name": control_effect_name,
+		"dice_roll": dice_roll,
+		"save_bonus": save_bonus,
+		"save_total": save_total,
+		"save_dc": control_save_dc,
+		"save_type": control_save_type,
+		"resisted": resisted
+	}
+	if resisted:
+		clear_control_effects()
+	return result
 
 
 func has_active_control_effect(
@@ -876,7 +910,7 @@ func has_active_control_effect(
 	if control_effect_end_turn <= 0:
 		return false
 	
-	if current_battle_turn >= control_effect_end_turn:
+	if control_save_dc <= 0 and current_battle_turn >= control_effect_end_turn:
 		clear_control_effects()
 		return false
 	
@@ -890,17 +924,11 @@ func get_active_effect_descriptions(
 	if has_active_control_effect(
 		current_battle_turn
 	):
-		var control_turns_remaining: int = (
-			control_effect_end_turn
-			- current_battle_turn
-		)
-		
-		descriptions.append(
-			get_display_name()
-			+ ": Controle | "
-			+ str(control_turns_remaining)
-			+ "t"
-		)
+		if control_save_dc > 0:
+			descriptions.append(get_display_name() + ": " + control_effect_name + " | teste no fim do turno")
+		else:
+			var control_turns_remaining: int = control_effect_end_turn - current_battle_turn
+			descriptions.append(get_display_name() + ": Controle | " + str(control_turns_remaining) + "t")
 	
 	if is_buffed:
 		var buff_turns_remaining: int = (
@@ -955,6 +983,7 @@ func update_status_effects(
 	
 	if (
 		control_effect_end_turn > 0
+		and control_save_dc <= 0
 		and current_battle_turn
 		>= control_effect_end_turn
 	):

@@ -1,430 +1,269 @@
 extends Node
 
-# Diálogos da estrada até o monastério, fornecidos no roteiro.
+# Encontro na estrada para o monastério de Hashagur.
 const SCENES := {
-	"opening": [
-		"Ação|O grupo segue por uma estrada estreita entre a floresta e as montanhas.",
-		"Ação|Uiliam caminha à frente. Kasum segue carregando sua arma. Aniri observa tudo ao redor enquanto o aventureiro permanece próximo.",
-		"Kasum|Quanto falta?",
-		"Sir Uiliam|Algumas horas.",
-		"Kasum|Você disse isso há algumas horas.",
-		"Sir Uiliam|Disse há quarenta minutos.",
-		"Kasum|Pareceu mais.",
-		"Aniri|Está arrependido de ter vindo?",
-		"Kasum|Ainda não vi ouro suficiente para decidir.",
-		"Aniri|Pelo menos é consistente.",
-		"Ação|Mais à frente, duas pessoas surgem caminhando na direção contrária.",
-		"Ação|Um jovem humano acompanha uma elfa. Ambos parecem exaustos e suas roupas carregam marcas de fuligem e dias de estrada.",
-		"Ação|A elfa segura um antigo grimório fortemente contra o peito.",
-		"Aniri|Esperem.",
-		"Aniri|Uma elfa?",
-		"Aventureiro|O que tem?",
-		"Aniri|Fora dos bosques?",
-		"Ação|Ela então olha para Litz.",
-		"Aniri|E acompanhada de um humano?",
-		"Kasum|Talvez gostem um do outro.",
-		"Ação|Aniri olha para Kasum.",
-		"Aniri|Essa foi surpreendentemente uma boa observação.",
-		"Kasum|Tenho momentos.",
-		"Aniri|Elfos de Sylvanos raramente deixam suas terras.",
-		"Aniri|Alguma coisa aconteceu.",
-		"Ação|Ao perceber o grupo, Litz ergue uma mão.",
-		"Litz|Olá!",
-		"Ação|Ele vê as armas de Kasum e Uiliam.",
-		"Litz|Somos inofensivos.",
-		"Arievilo|Litz...",
-		"Litz|O quê?",
-		"Arievilo|Ninguém perguntou.",
-		"Litz|Ainda.",
-		"Litz|Achei melhor esclarecer antes.",
-		"Aniri|Está conseguindo exatamente o efeito contrário.",
-		"Ação|Arievilo faz uma pequena reverência.",
-		"Arievilo|Perdoem-no.",
-		"Arievilo|Meu nome é Arievilo.",
-		"Ação|Ela olha carinhosamente para o humano.",
-		"Arievilo|E este é Litz.",
-		"Litz|Feiticeiro.",
-		"Ação|Pausa.",
-		"Litz|Um bom feiticeiro.",
-		"Arievilo|Ele é melhor com magia do que com pessoas.",
-		"Litz|Muito melhor.",
-		"Ação|Uiliam se aproxima.",
-		"Sir Uiliam|Sou Uiliam, paladino a serviço da Ordem de Vanir. Consagrei minha espada à preservação da ordem, à defesa dos inocentes e ao triunfo da justiça.",
-		"Litz|Essa apresentação foi muito melhor que a minha.",
-		"Aniri|Ele pratica.",
-		"Sir Uiliam|Estão viajando sozinhos?",
-		"Arievilo|Agora estamos.",
-		"Sir Uiliam|Agora?",
-		"Ação|Arievilo aperta o grimório contra o peito.",
-		"Arievilo|Viemos das terras próximas ao Rio de Sylvanos.",
-		"Aniri|Você vivia no bosque?",
-		"Arievilo|Sim.",
-		"Litz|E eu vivia na cidade próxima.",
-		"Aniri|Então vocês já se conheciam?",
-		"Litz|Conhecer é uma palavra forte.",
-		"Arievilo|Nós nos víamos algumas vezes.",
-		"Litz|Ela ia aos redores da cidade.",
-		"Litz|Eu a via.",
-		"Arievilo|E raramente dizia alguma coisa.",
-		"Litz|Não precisava.",
-		"Aniri|Por quê?",
-		"Litz|Porque ela era bonita.",
-		"Ação|Silêncio.",
-		"Arievilo|Litz...",
-		"Litz|O quê? Ainda é.",
-		"Ação|Arievilo abaixa discretamente o rosto, constrangida.",
-		"Aniri|Definitivamente não sabe conversar.",
-		"Litz|Já me disseram isso.",
-		"Sir Uiliam|O que aconteceu em Sylvanos?",
-		"Ação|O semblante dos dois muda.",
-		"Arievilo|Foi durante a noite.",
-		"Litz|Uma fenda surgiu na floresta.",
-		"Ação|O aventureiro sente um leve arrepio.",
-		"Litz|Perto demais da cidade.",
-		"Arievilo|As criaturas atravessaram antes que alguém entendesse o que estava acontecendo.",
-		"Litz|Elas atacaram o bosque primeiro.",
-		"Arievilo|Depois alcançaram a cidade.",
-		"Litz|Na verdade, pouco importava qual veio primeiro.",
-		"Litz|Quando percebemos...",
-		"Ação|Ele olha para a estrada.",
-		"Litz|...os dois lugares estavam sendo destruídos.",
-		"Sir Uiliam|E vocês escaparam juntos?",
-		"Litz|Não.",
-		"Ação|Arievilo olha para ele.",
-		"Litz|Quando vi as criaturas saindo da floresta, pensei nela.",
-		"Aniri|Você correu para longe delas, imagino.",
-		"Litz|Corri para a floresta.",
-		"Ação|Aniri fica em silêncio.",
-		"Sir Uiliam|Para procurá-la?",
-		"Litz|Sim.",
-		"Arievilo|Ele não precisava fazer isso.",
-		"Litz|Precisava.",
-		"Arievilo|Você mal me conhecia.",
-		"Litz|Conhecia o suficiente.",
-		"Ação|Arievilo não responde.",
-		"Litz|Encontrei Arievilo perto do que restava de sua casa.",
-		"Ação|Ele olha para o grimório.",
-		"Litz|Estava inconsciente.",
-		"Litz|Agarrada nesse livro como se a vida dela dependesse disso.",
-		"Aniri|E as criaturas?",
-		"Litz|Mortas.",
-		"Aniri|Você matou?",
-		"Litz|Não.",
-		"Ação|Arievilo olha para as próprias mãos.",
-		"Arievilo|Quando acordei, não lembrava do que havia acontecido.",
-		"Litz|Havia várias criaturas ao redor dela.",
-		"Litz|Queimadas.",
-		"Ação|O grupo fica em silêncio.",
-		"Litz|Completamente incendiadas.",
-		"Sir Uiliam|Magia?",
-		"Litz|Provavelmente.",
-		"Arievilo|Não me lembro de lançar feitiço algum.",
-		"Ação|Ela aperta o grimório.",
-		"Arievilo|Só me lembro da minha mãe...",
-		"Ação|Pausa.",
-		"Arievilo|...e depois de acordar com Litz ao meu lado.",
-		"Aniri|O que você fez?",
-		"Litz|Peguei ela.",
-		"Aniri|“Pegou”?",
-		"Litz|Carreguei.",
-		"Litz|Achei que “peguei” fosse suficientemente claro.",
-		"Aniri|Não foi.",
-		"Litz|Carreguei Arievilo para uma área mais afastada.",
-		"Litz|Depois fiquei com ela.",
-		"Sir Uiliam|A noite inteira?",
-		"Litz|O ataque durou até o amanhecer.",
-		"Litz|Então sim.",
-		"Arievilo|Ele não dormiu.",
-		"Litz|Não era uma noite boa para dormir.",
-		"Arievilo|Toda vez que alguma criatura se aproximava...",
-		"Arievilo|ele ficava entre ela e eu.",
-		"Ação|Litz parece desconfortável com a atenção.",
-		"Litz|Era o lugar mais lógico para ficar.",
-		"Arievilo|Você quase morreu duas vezes.",
-		"Litz|Mas não morri.",
-		"Arievilo|Essa não é a questão.",
-		"Litz|Costuma ser uma questão importante.",
-		"Ação|Arievilo sorri levemente.",
-		"Arievilo|Quando o sol nasceu...",
-		"Arievilo|não havia mais floresta para onde voltar.",
-		"Litz|Nem cidade.",
-		"Ação|Silêncio.",
-		"Arievilo|Então continuamos juntos.",
-		"Aniri|Certo.",
-		"Ação|Ela aponta discretamente entre os dois.",
-		"Aniri|Agora estou curiosa.",
-		"Aniri|Vocês eram praticamente conhecidos...",
-		"Aniri|a floresta e a cidade foram destruídas...",
-		"Aniri|e agora estão de mãos dadas.",
-		"Litz|Muitas coisas aconteceram.",
-		"Arievilo|Conversamos.",
-		"Litz|Muito.",
-		"Arievilo|Litz passou a noite inteira tentando me manter viva.",
-		"Arievilo|Depois continuou comigo quando não existia mais nada que o obrigasse a ficar.",
-		"Ação|Ela olha para ele.",
-		"Arievilo|Passei aquela noite acreditando que tudo havia acabado.",
-		"Arievilo|Minha família.",
-		"Arievilo|Minha casa.",
-		"Arievilo|Meu povo.",
-		"Arievilo|Eu não conseguia imaginar o dia seguinte.",
-		"Arievilo|Mas ele continuava dizendo que chegaríamos até ele.",
-		"Litz|E chegamos.",
-		"Arievilo|Foi quando percebi que era muito mais corajoso do que parecia.",
-		"Aniri|Isso ainda está em investigação.",
-		"Litz|Obrigado.",
-		"Aniri|Não foi elogio.",
-		"Ação|Arievilo segura a mão dele.",
-		"Arievilo|Eu me apaixonei por ele naquela noite.",
-		"Ação|Litz sorri.",
-		"Aniri|E você?",
-		"Litz|Eu já achava ela linda antes.",
-		"Arievilo|Litz.",
-		"Litz|Mas não foi só isso.",
-		"Ação|Ele tenta encontrar as palavras.",
-		"Litz|Arievilo é...",
-		"Ação|Pausa.",
-		"Litz|simples.",
-		"Ação|Todos olham para ele.",
-		"Arievilo|Simples?",
-		"Litz|No bom sentido.",
-		"Aniri|Isso está piorando.",
-		"Litz|Ela não finge.",
-		"Litz|Não tenta parecer mais importante do que é.",
-		"Litz|Ela gosta das coisas pequenas.",
-		"Litz|Das árvores.",
-		"Litz|De livros.",
-		"Litz|De ouvir alguém falar mesmo quando essa pessoa fala demais.",
-		"Ação|Arievilo sorri.",
-		"Litz|Ela é bonita quando está feliz.",
-		"Litz|Também é bonita quando está triste, mas eu preferia que estivesse feliz.",
-		"Ação|Pequena pausa.",
-		"Litz|Foi isso.",
-		"Arievilo|Essa foi provavelmente a coisa mais bonita que você já disse.",
-		"Litz|Eu sabia exatamente o que estava dizendo.",
-		"Arievilo|Isso é o mais surpreendente.",
-		"Ação|O aventureiro permanece olhando para Arievilo.",
-		"Ação|O som ambiente diminui discretamente.",
-		"Aventureiro (pensamento)|Uma fenda...",
-		"Aventureiro (pensamento)|Ela estava no centro de tudo.",
-		"Ação|Um calafrio percorre seu corpo.",
-		"Aventureiro (pensamento)|Criaturas mortas.",
-		"Aventureiro (pensamento)|Nenhuma lembrança.",
-		"Aventureiro (pensamento)|Por que isso parece familiar?",
-		"Ação|Por um instante, sua visão parece distorcer.",
-		"Aventureiro (pensamento)|Eu conheço essa sensação.",
-		"Aventureiro (pensamento)|Não...",
-		"Aventureiro (pensamento)|eu deveria conhecer.",
-		"Aniri|Aventureiro?",
-		"Ação|O som retorna.",
-		"Aventureiro|Estou bem.",
-		"Ação|Aniri observa o aventureiro.",
-		"Aniri|Você diz isso toda vez que claramente não está.",
-		"Sir Uiliam|Para onde estão seguindo?",
-		"Arievilo|Ainda não sabemos.",
-		"Arievilo|Alguma vila.",
-		"Arievilo|Algum lugar onde possamos descansar por alguns dias.",
-		"Litz|Estamos andando há dois dias.",
-		"Arievilo|Dois dias.",
-		"Litz|E estamos praticamente sem comida.",
-		"Arievilo|Litz...",
-		"Litz|É importante que saibam.",
-		"Arievilo|Você poderia simplesmente pedir educadamente.",
-		"Litz|Vocês têm ouro?",
-		"Ação|Silêncio.",
-		"Aniri|Extraordinário.",
-		"Litz|O quê?",
-		"Aniri|Você conseguiu escolher exatamente a pior maneira de pedir ajuda.",
-		"Litz|Mas entenderam.",
-		"Arievilo|Peço desculpas.",
-		"Arievilo|Já caminhamos por dois dias e praticamente não comemos.",
-		"Arievilo|Qualquer ajuda seria suficiente.",
-		"Litz|Foi isso que eu quis dizer.",
-		"Aniri|Não foi isso que você disse.",
-	],
-	"help": [
-		"Aventureiro|Há uma vila seguindo esta estrada.",
-		"Aventureiro|A Ponte da Esmeralda foi restaurada e reforços da Ordem chegaram ontem.",
-		"Arievilo|Então está protegida?",
-		"Sir Uiliam|Sim.",
-		"Ação|Arievilo respira aliviada.",
-		"Arievilo|Obrigada.",
-		"Litz|Ótimo.",
-		"Litz|Agora só precisamos não morrer de fome até chegar lá.",
-		"Arievilo|Litz...",
-		"Ação|Uiliam entrega algumas moedas ao casal.",
-		"Sir Uiliam|Peguem.",
-		"Arievilo|Não precisamos de muito.",
-		"Sir Uiliam|Comprem comida ao chegar.",
-		"Sir Uiliam|Digam ao prefeito que foram enviados por nós.",
-		"Arievilo|Obrigada, Sr. Uiliam.",
-		"Arievilo|E a você também, aventureiro.",
-		"Litz|Eu também agradeço.",
-		"Litz|Embora provavelmente devesse ter começado por essa parte.",
-		"Aniri|Está aprendendo.",
-		"Aniri|Agora que estamos falando de comida...",
-		"Ação|Ela olha para Litz.",
-		"Aniri|Por que você não caçou alguma coisa?",
-		"Litz|Porque não sei caçar.",
-		"Aniri|Finalmente uma resposta honesta.",
-		"Litz|E porque gastar magia caçando seria irresponsável.",
-		"Aniri|Aí estragou.",
-		"Litz|Se alguma criatura aparecesse, eu precisaria das minhas forças.",
-		"Aniri|Então vocês passaram fome para preservar sua magia.",
-		"Litz|Sim.",
-		"Aniri|Inclusive ela.",
-		"Litz|Eu também estava com fome.",
-		"Aniri|Isso não ajuda sua defesa.",
-		"Litz|Minhas habilidades são intelectuais e arcanas.",
-		"Aniri|Seu grande plano de sobrevivência era ser inteligente até aparecer comida?",
-		"Litz|Eu não colocaria dessa forma.",
-		"Aniri|Eu colocaria.",
-		"Aniri|Frouxo.",
-		"Ação|Litz franze o rosto.",
-		"Litz|Eu corri para dentro de uma floresta cheia de monstros para buscá-la.",
-		"Aniri|E depois desaprendeu a caçar.",
-		"Litz|Nunca soube.",
-		"Ação|Arievilo tenta esconder um sorriso.",
-		"Arievilo|Ele realmente não sabe.",
-		"Aniri|Tudo bem.",
-		"Aniri|Frouxo em treinamento de sobrevivência.",
-		"Litz|Aceito.",
-	],
-	"refuse": [
-		"Aventureiro|Não conheço nenhum lugar que possa recomendar.",
-		"Ação|Arievilo assente lentamente.",
-		"Arievilo|Entendo.",
-		"Arievilo|Obrigada por nos ouvirem.",
-		"Litz|Continuaremos pela estrada.",
-		"Arievilo|Alguma coisa aparecerá.",
-		"Ação|Breve pausa.",
-		"Arievilo|Ou não.",
-		"Litz|Ela é sempre assim.",
-		"Arievilo|A floresta desapareceu em uma noite.",
-		"Arievilo|Estou tentando melhorar.",
-		"Ação|Os dois começam a partir.",
-		"Sir Uiliam|Esperem.",
-		"Ação|Eles param.",
-		"Sir Uiliam|Existe uma vila seguindo para oeste.",
-		"Ação|O aventureiro olha para ele.",
-		"Sir Uiliam|Não obrigarei ninguém a confiar em desconhecidos.",
-		"Sir Uiliam|Mas também não deixarei duas pessoas sem abrigo quando sei que existe segurança próxima.",
-		"Ação|Uiliam indica a direção.",
-		"Sir Uiliam|Sigam a estrada até a Ponte da Esmeralda.",
-		"Sir Uiliam|Depois continuem pela estrada principal.",
-		"Arievilo|Obrigada.",
-		"Litz|Agradecemos.",
-		"Sir Uiliam|Não saiam da estrada.",
-		"Litz|Não pretendemos.",
-		"Arievilo|Já vimos floresta suficiente por algum tempo.",
-	],
-	"ending": [
-		"Ação|Antes de partir, Arievilo olha para o grupo.",
-		"Arievilo|E vocês?",
-		"Arievilo|Para onde estão indo?",
-		"Sir Uiliam|Para o monastério próximo à floresta.",
-		"Ação|Arievilo fica séria.",
-		"Arievilo|Então tenham cuidado.",
-		"Aniri|Depois de Sylvanos, imagino que você diga isso para todo mundo.",
-		"Arievilo|Provavelmente.",
-		"Arievilo|Não consigo evitar.",
-		"Litz|Ela acha que tudo vai dar errado.",
-		"Arievilo|Porque ultimamente costuma dar.",
-		"Litz|Mas nem tudo.",
-		"Ação|Ele segura a mão dela.",
-		"Arievilo|Não.",
-		"Ação|Ela olha para ele.",
-		"Arievilo|Nem tudo.",
-		"Ação|Aniri observa o casal.",
-		"Aniri|Uma elfa dos bosques com um humano da cidade.",
-		"Aniri|Definitivamente não se vê isso todos os dias.",
-		"Litz|Eu sei.",
-		"Aniri|E você parece orgulhoso.",
-		"Litz|Você olhou para ela?",
-		"Ação|Arievilo fecha os olhos por um instante.",
-		"Arievilo|Litz...",
-		"Litz|É uma pergunta válida.",
-		"Aniri|Você realmente acha ela muito bonita.",
-		"Litz|Muito.",
-		"Arievilo|Podemos ir embora agora?",
-		"Ação|Aniri ri.",
-		"Aniri|Agora entendi.",
-		"Arievilo|Não é apenas isso.",
-		"Aniri|Eu sei.",
-		"Ação|Aniri olha para Litz.",
-		"Aniri|A parte de correr para uma floresta cheia de monstros ajudou bastante.",
-		"Arievilo|Muito.",
-		"Litz|Posso continuar dizendo que foi uma decisão lógica?",
-		"Arievilo|Não.",
-		"Arievilo|Espero que possamos nos encontrar novamente.",
-		"Aniri|Quando estiverem alimentados, de preferência.",
-		"Litz|Concordo.",
-		"Arievilo|Boa sorte.",
-		"Sir Uiliam|Boa viagem.",
-		"Ação|Arievilo e Litz seguem pela estrada.",
-		"Ação|Depois de alguns passos, Arievilo segura a mão de Litz.",
-		"Ação|Ele olha para ela e sorri.",
-		"Ação|O grupo observa o casal desaparecer pela estrada.",
-		"Aniri|Uma fenda abriu no coração de Sylvanos.",
-		"Sir Uiliam|Sim.",
-		"Aniri|Destruiu uma floresta protegida e uma cidade inteira.",
-		"Sir Uiliam|Sim.",
-		"Aniri|Isso não deveria ser possível.",
-		"Sir Uiliam|Não.",
-		"Aniri|Então temos criaturas próximas da vila...",
-		"Aniri|cultistas aparecendo novamente...",
-		"Aniri|e agora fendas surgindo onde não deveriam.",
-		"Kasum|Isso significa mais trabalho?",
-		"Aniri|Você consegue pensar em outra coisa?",
-		"Kasum|Consigo.",
-		"Kasum|O pagamento do trabalho.",
-		"Ação|Aniri suspira.",
-		"Ação|O aventureiro continua olhando para o caminho.",
-		"Aventureiro (pensamento)|Arievilo não lembra do que aconteceu perto da fenda.",
-		"Aventureiro (pensamento)|Eu não lembro de nada antes de chegar aqui.",
-		"Ação|Um calafrio.",
-		"Aventureiro (pensamento)|Coincidência?",
-		"Ação|Por um instante, um ruído estranho invade o som ambiente.",
-		"Aventureiro (pensamento)|Ou existe alguma coisa nas fendas que apaga aquilo que veio antes?",
-		"Aniri|De novo.",
-		"Aventureiro|O quê?",
-		"Aniri|Essa cara.",
-		"Aventureiro|Que cara?",
-		"Aniri|A de quem está em algum lugar muito longe daqui.",
-		"Aventureiro|Só estava pensando.",
-		"Aniri|Nas fendas?",
-		"Ação|O aventureiro não responde.",
-		"Aniri|Imaginei.",
-		"Missão pessoal atualizada|Arievilo perdeu parte das lembranças da noite em que uma fenda destruiu Sylvanos. Sua própria ausência de memórias parece reagir cada vez mais aos relatos sobre essas rupturas. As fendas podem guardar uma pista sobre sua origem.",
-		"Kasum|Terminamos?",
-		"Aniri|Que homem sensível.",
-		"Kasum|Estou sendo sensível com nosso tempo.",
-		"Kasum|Estamos indo atrás de um culto.",
-		"Kasum|O culto provavelmente tem ouro.",
-		"Sir Uiliam|Não sabemos disso.",
-		"Kasum|Então precisamos descobrir.",
-		"Aniri|Uma motivação admirável.",
-		"Kasum|Obrigado.",
-		"Sir Uiliam|Ele tem razão sobre continuarmos.",
-		"Aniri|Isso ainda parece doer em você.",
-		"Sir Uiliam|Vamos.",
-		"Ação|O grupo retoma a caminhada.",
-		"Ação|A câmera sobe.",
-		"Ação|Ao longe, entre as montanhas e a floresta, finalmente aparece o monastério.",
-		"Objetivo atualizado|Chegue ao monastério e encontre Hashagur. Descubra o que ele sabe sobre o culto, os ataques recentes e o que está acontecendo nas proximidades de Sylvanos.",
-	],
+	"road": """
+Ação|O grupo segue pela estrada entre a floresta e as montanhas.
+Kasum|Quanto falta?
+Sir Uiliam|Segundo o mapa, horas.
+Kasum|Disse isso antes.
+Sir Uiliam|Há quarenta minutos.
+Kasum|Pareceu mais.
+Aniri|Começou a se arrepender?
+Kasum|Ainda não encontrei ouro suficiente para decidir.
+Aniri|Pelo menos é consistente.
+Ação|Mais adiante, duas pessoas caminham na direção contrária: um humano e uma elfa, exaustos e cobertos de fuligem e poeira.
+Ação|A elfa segura um velho grimório contra o peito. O homem permanece sempre próximo dela.
+Aniri|Uma elfa?
+Aventureiro|Isso é estranho?
+Aniri|Fora dos bosques? Bastante.
+Ação|Os dois se aproximam.
+""",
+	"meeting": """
+Litz|Antes que perguntem, não somos uma ameaça.
+Arievilo|Litz...
+Litz|O quê?
+Arievilo|Ninguém perguntou.
+Litz|Estou me antecipando.
+Aniri|Não está ajudando.
+Ação|Arievilo faz uma pequena reverência.
+Arievilo|Sou Arievilo.
+Ação|Ela indica o homem ao seu lado.
+Arievilo|E ele é Litz.
+Litz|Feiticeiro.
+@pause
+Litz|Um bom feiticeiro.
+Arievilo|É melhor com magia do que com apresentações.
+Litz|Muito melhor.
+Ação|Uiliam observa as roupas queimadas dos dois.
+Sir Uiliam|De onde estão vindo?
+Ação|O leve humor desaparece.
+Arievilo|Da Cidade de Montirel.
+""",
+	"capital": """
+Sir Uiliam|A cidade mais próxima.
+Litz|O que restou dela.
+Ação|Uiliam imediatamente fica sério.
+Sir Uiliam|Explique.
+Litz|Estamos andando há dois dias.
+Litz|Duas noites atrás, a cidade foi atacada.
+Aventureiro|Criaturas?
+Arievilo|Muitas.
+Sir Uiliam|A capital possui um Selo.
+Arievilo|Possuía.
+@pause
+Sir Uiliam|O Selo caiu?
+Litz|Sim.
+Ação|Uiliam claramente não esperava essa resposta.
+Aniri|Isso já aconteceu antes?
+Sir Uiliam|Não com uma grande cidade.
+@pause
+Aventureiro|Sabem por que falhou?
+Litz|Não.
+Litz|A única coisa diferente foi a troca de rei.
+Sir Uiliam|Troca de rei?
+Litz|O novo rei assumiu há pouco mais de um mês.
+Ação|Uiliam pensa por um instante.
+Sir Uiliam|E um mês depois a capital foi atacada.
+Litz|Sim.
+Arievilo|Mas ninguém sabia o que estava acontecendo.
+Arievilo|Quando perceberam que o Selo não estava nos protegendo...
+Ação|Ela olha para o chão.
+Arievilo|já havia criaturas dentro da cidade.
+""",
+	"forest": """
+Aniri|E você?
+Ação|Ela olha para Arievilo.
+Aniri|Não parece alguém da capital.
+Arievilo|Não sou.
+Arievilo|Eu vivia no Bosque ao lado da cidade.
+Ação|Ela aperta o grimório.
+Arievilo|Perto demais da cidade.
+Litz|Quando o ataque começou, alguma coisa também aconteceu na floresta.
+Aventureiro|O quê?
+Litz|Uma fenda.
+Ação|O aventureiro fica imóvel por um instante.
+Litz|As criaturas vieram de todos os lados.
+Arievilo|A floresta queimou.
+@pause
+Arievilo|Minha casa também.
+Ação|Ela não continua. Litz olha para ela antes de falar.
+Litz|Eu morava na capital.
+Aniri|Então como vocês acabaram juntos?
+Litz|Eu fui procurá-la.
+Aniri|Durante o ataque?
+Litz|Sim.
+Aniri|Na floresta?
+Litz|Sim.
+Ação|Aniri olha para Arievilo.
+Aniri|Vocês já se conheciam?
+Arievilo|Sim, mas não é hora de falar sobre.
+Ação|É a primeira vez que ela esboça um sorriso.
+""",
+	"book": """
+Sir Uiliam|Como a encontrou?
+Litz|Inconsciente.
+Ação|Ele olha para o grimório.
+Litz|Segurando esse livro.
+Arievilo|Era da minha mãe.
+@pause
+Aniri|Havia criaturas por perto?
+Litz|Sim.
+Aniri|E você matou todas?
+Litz|Não.
+Ação|Arievilo baixa os olhos.
+Litz|Elas já estavam mortas.
+Aventureiro|Como?
+Litz|Queimadas.
+Litz|Todas.
+Sir Uiliam|Magia?
+Litz|Imagino.
+Ação|Uiliam olha para Arievilo.
+Sir Uiliam|Você se lembra?
+Arievilo|Não.
+Ação|Ela aperta o grimório.
+Arievilo|Minha última lembrança é da minha mãe.
+Arievilo|Depois disso...
+Ação|Ela olha para Litz.
+Arievilo|eu acordei com ele ao meu lado.
+""",
+	"together": """
+Aniri|E ele ficou?
+Arievilo|A noite inteira.
+Litz|Ela estava ferida.
+Arievilo|Ele quase morreu duas vezes.
+Litz|Mas não morri.
+Arievilo|Ele sempre responde isso.
+Litz|Continua sendo verdade.
+Ação|Arievilo segura discretamente a mão dele.
+Arievilo|Quando acordei...
+Arievilo|não tinha casa.
+Arievilo|Não sabia se minha família estava viva.
+@pause
+Arievilo|Não havia nada para onde voltar.
+Ação|Ela olha para Litz.
+Arievilo|Mas ele ficou.
+Litz|Não ia deixar você sozinha.
+Arievilo|Eu sei.
+Ação|Os dois permanecem de mãos dadas.
+Aniri|Entendi.
+Litz|O quê?
+Aniri|Vocês dois.
+Ação|Litz sorri.
+Litz|Eu sempre achei ela bonita.
+Arievilo|Litz...
+Litz|O quê? É verdade.
+Ação|Arievilo balança a cabeça, mas pela primeira vez parece genuinamente mais leve.
+""",
+	"rift": """
+Ação|O aventureiro permanece olhando para Arievilo.
+Aventureiro|Você perdeu suas lembranças perto da fenda.
+Arievilo|Sim.
+Aventureiro|E não lembra do que aconteceu antes de acordar.
+Arievilo|Não daquela parte.
+Ação|O som ao redor diminui discretamente.
+Aventureiro (pensamento)|Uma fenda.
+@pause
+Aventureiro (pensamento)|E uma parte da memória desaparecida.
+Ação|Ele sente um calafrio.
+Aniri|[PLAYER_NAME]?
+Ação|O som retorna.
+Aventureiro|Estou bem.
+Aniri|Você sempre diz isso com uma cara que diz o contrário.
+Aventureiro|Só estava pensando.
+Aniri|Nas fendas.
+Ação|Ele não responde.
+Aniri|Imaginei.
+""",
+	"directions": """
+Sir Uiliam|Para onde estão indo?
+Arievilo|Não sabemos.
+Litz|Para longe da capital.
+Arievilo|Estamos caminhando há dois dias.
+Litz|E quase sem comida.
+Arievilo|Você poderia pedir de uma maneira menos vergonhosa.
+Litz|Estou tentando ser objetivo.
+Ação|Ele olha para o grupo.
+Litz|Vocês conhecem algum lugar seguro?
+Aventureiro|Há uma vila atrás de nós.
+Aventureiro|A Ponte da Esmeralda foi restaurada ontem.
+Arievilo|É segura?
+Ação|Uiliam hesita apenas um instante.
+Sir Uiliam|Há reforços da Ordem lá.
+Sir Uiliam|É o melhor lugar próximo.
+Ação|Arievilo respira aliviada.
+Arievilo|Obrigada.
+Ação|Uiliam entrega algumas moedas a Litz.
+Litz|Não precisamos—
+Arievilo|Precisamos.
+Ação|Litz olha para ela.
+Litz|Precisamos.
+Sir Uiliam|Comprem comida.
+Litz|Obrigado.
+Aniri|Viu? Não foi tão difícil.
+Litz|Eu estava chegando nessa parte.
+""",
+	"farewell": """
+Arievilo|E vocês?
+Sir Uiliam|Vamos ao monastério de Hashagur.
+Ação|Arievilo fica séria.
+Arievilo|Tenham cuidado.
+Kasum|Pretendemos.
+Arievilo|Não estava falando por educação.
+Ação|Litz segura a mão dela.
+Litz|Ela acha que tudo vai dar errado.
+Arievilo|Ultimamente costuma dar.
+Litz|Nem tudo.
+Ação|Arievilo olha para ele e esboça um pequeno sorriso.
+Arievilo|Nem tudo.
+Aniri|Gostei dela.
+Litz|Eu também.
+Arievilo|Percebi.
+Ação|Aniri ri.
+Arievilo|Espero que nos encontremos novamente.
+Sir Uiliam|Boa viagem.
+Ação|O casal segue pela estrada de mãos dadas.
+""",
+	"after": """
+Ação|O grupo observa os dois se afastarem.
+Aniri|Uma capital protegida caiu.
+Sir Uiliam|Sim.
+Aniri|Um mês depois da troca de rei.
+Ação|Uiliam permanece olhando para a estrada.
+Sir Uiliam|Também percebi.
+Kasum|Isso muda nosso caminho?
+Sir Uiliam|Não.
+Sir Uiliam|Primeiro Hashagur.
+Aventureiro|E depois?
+Ação|Uiliam olha na direção de onde Litz e Arievilo vieram.
+Sir Uiliam|Depois descobrimos como um Selo de uma capital simplesmente caiu.
+Ação|O aventureiro permanece pensativo.
+Aventureiro (pensamento)|E o que uma fenda tem a ver comigo.
+"""
 }
+
+const ORDER := [
+	"road", "meeting", "capital", "forest", "book",
+	"together", "rift", "directions", "farewell", "after"
+]
+
 
 static func get_scene(scene_id: String) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	for raw_line in SCENES.get(scene_id, []):
-		var line: String = str(raw_line)
+	if not SCENES.has(scene_id):
+		return result
+	for raw_line in str(SCENES[scene_id]).strip_edges().split("\n"):
+		var line: String = raw_line.strip_edges()
+		if line == "@pause":
+			result.append({"type": "pause", "duration": 0.6})
+			continue
 		var divider: int = line.find("|")
 		if divider < 1:
 			continue
 		var speaker: String = line.substr(0, divider)
-		result.append({
-			"type": "action" if speaker == "Ação" else "dialogue",
-			"speaker": speaker,
-			"text": line.substr(divider + 1)
-		})
+		var dialogue_text: String = line.substr(divider + 1)
+		if speaker == "Ação":
+			result.append({"type": "action", "text": dialogue_text})
+		else:
+			result.append({"type": "dialogue", "speaker": speaker, "text": dialogue_text})
 	return result

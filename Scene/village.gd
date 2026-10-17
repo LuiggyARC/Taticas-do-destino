@@ -26,8 +26,16 @@ const BRIDGE_RETURN_EVENT_ID := "emerald_bridge_village_return"
 const KASUM_RECRUITMENT_MISSION_ID := "kasum_recruitment"
 const KASUM_TAVERN_EVENT_ID := "kasum_tavern_recruited"
 const HEALER_NIGHT_EVENT_ID := "healer_night_after_kasum"
+const TEMPLE_DEPARTURE_EVENT_ID := "temple_departure_started"
+const HEALER_NIGHT_CONVERSATION_CAST: Array[String] = [
+	"Sir Uiliam", "Aniri", "Aventureiro"
+]
+const MORNING_OPEN_LOCATIONS := ["central_square", "shop"]
 const MAYOR_CONVERSATION_CAST: Array[String] = [
 	"Sir Uiliam", "Aniri", "Aventureiro", "Prefeito"
+]
+const BRIDGE_RETURN_CONVERSATION_CAST: Array[String] = [
+	"Sir Uiliam", "Aniri", "Aventureiro", "Jhon", "Prefeito"
 ]
 const BACKGROUND_REFERENCE_SIZE := Vector2(
 	2760.0,
@@ -138,6 +146,7 @@ var bridge_return_running: bool = false
 var kasum_event_running: bool = false
 var healer_night_running: bool = false
 var temple_button: Button
+var world_map_button: Button
 var temple_departure_running: bool = false
 var central_square_tutorial: AcceptDialog
 
@@ -307,6 +316,7 @@ func _ready() -> void:
 	create_hotspot_layer()
 	create_location_buttons()
 	create_village_interface()
+	create_world_map_button()
 	create_temple_button()
 	create_location_view()
 	create_village_story_event()
@@ -493,19 +503,40 @@ func create_location_buttons() -> void:
 func is_next_morning() -> bool:
 	return SaveManager.has_completed_story_event(HEALER_NIGHT_EVENT_ID)
 
+func has_started_temple_journey() -> bool:
+	return (
+		SaveManager.has_completed_story_event(TEMPLE_DEPARTURE_EVENT_ID)
+		or SaveManager.has_completed_story_event("temple_road_litz_arievilo")
+		or SaveManager.has_completed_story_event("temple_hashagur_arrival")
+		or SaveManager.has_completed_story_event("temple_hashagur_briefing")
+	)
+
 func should_start_healer_night() -> bool:
 	return MissionManager.is_mission_completed(KASUM_RECRUITMENT_MISSION_ID) and not is_next_morning()
 
+static func is_location_open_in_morning(location_id: String) -> bool:
+	return location_id in MORNING_OPEN_LOCATIONS
+
 func refresh_village_access() -> void:
 	var morning: bool = is_next_morning()
+	var departed: bool = has_started_temple_journey()
 	for location_id in location_buttons.keys():
 		var button: Button = location_buttons.get(location_id) as Button
 		if not is_instance_valid(button):
 			continue
-		button.disabled = (morning and location_id != "central_square") or (location_id == "carpenter" and SaveManager.has_completed_story_event(BRIDGE_RETURN_EVENT_ID))
-		button.tooltip_text = "Indisponível nesta manhã" if morning and location_id != "central_square" else ("Carpintaria fechada" if button.disabled else str(LOCATION_NAMES.get(location_id, location_id)))
+		var closed_for_morning: bool = morning and not is_location_open_in_morning(str(location_id))
+		button.disabled = closed_for_morning or (location_id == "carpenter" and SaveManager.has_completed_story_event(BRIDGE_RETURN_EVENT_ID))
+		button.tooltip_text = "Indisponível nesta manhã" if closed_for_morning else ("Carpintaria fechada" if button.disabled else str(LOCATION_NAMES.get(location_id, location_id)))
 	if is_instance_valid(temple_button):
-		temple_button.visible = morning
+		temple_button.visible = morning and not departed
+	if is_instance_valid(world_map_button):
+		world_map_button.anchor_top = 1.0 if departed else 0.0
+		world_map_button.anchor_bottom = 1.0 if departed else 0.0
+		world_map_button.offset_left = -306.0 if departed else -216.0
+		world_map_button.offset_right = -18.0
+		world_map_button.offset_top = -82.0 if departed else 14.0
+		world_map_button.offset_bottom = -18.0 if departed else 62.0
+		world_map_button.add_theme_font_size_override("font_size", 23 if departed else 19)
 
 
 func create_hotspot_style(
@@ -671,6 +702,27 @@ func create_village_interface() -> void:
 		status_label
 	)
 
+func create_world_map_button() -> void:
+	world_map_button = Button.new()
+	var map_button: Button = world_map_button
+	map_button.name = "WorldMapButton"
+	map_button.text = "Mapa do mundo"
+	map_button.tooltip_text = "Ver estradas e destinos de Aviant"
+	map_button.anchor_left = 1.0
+	map_button.anchor_right = 1.0
+	map_button.offset_left = -216.0
+	map_button.offset_right = -18.0
+	map_button.offset_top = 14.0
+	map_button.offset_bottom = 62.0
+	map_button.add_theme_font_size_override("font_size", 19)
+	map_button.pressed.connect(func() -> void:
+		if healer_night_running or temple_departure_running:
+			return
+		SceneTransition.change_scene_to_file("res://Scene/world_map.tscn")
+	)
+	add_child(map_button)
+
+
 func create_temple_button() -> void:
 	if is_instance_valid(temple_button):
 		return
@@ -701,7 +753,7 @@ func create_temple_button() -> void:
 	temple_button.visible = false
 
 func on_temple_pressed() -> void:
-	if not is_next_morning() or healer_night_running or temple_departure_running:
+	if not is_next_morning() or has_started_temple_journey() or healer_night_running or temple_departure_running:
 		return
 	temple_departure_running = true
 	temple_button.disabled = true
@@ -724,13 +776,18 @@ func on_temple_pressed() -> void:
 	var save_path: String = SaveManager.get_active_save_path()
 	var save_data: Dictionary = SaveManager.read_save_data(save_path)
 	save_data["current_location"] = "temple_road"
+	save_data["world_map_node"] = "bridge"
+	var completed_events: Array = save_data.get("completed_story_events", [])
+	if TEMPLE_DEPARTURE_EVENT_ID not in completed_events:
+		completed_events.append(TEMPLE_DEPARTURE_EVENT_ID)
+	save_data["completed_story_events"] = completed_events
 	if not SaveManager.write_save_data(save_path, save_data):
 		push_warning("Não foi possível registrar a viagem ao templo.")
 		temple_departure_running = false
 		temple_button.disabled = false
 		return
 	GameState.current_location = "temple_road"
-	get_tree().change_scene_to_file("res://Scene/temple_road.tscn")
+	SceneTransition.change_scene_to_file("res://Scene/temple_road.tscn")
 
 func create_location_view() -> void:
 	if is_instance_valid(location_view):
@@ -843,13 +900,6 @@ func run_second_chance_carpenter_return() -> bool:
 	if not await run_location_story_event("second_chance_carpenter_return", carpenter_cast):
 		return false
 
-	var previous_choice: String = MissionManager.get_story_choice("aniri_judgment")
-	var branch_event_id: String = "second_chance_carpenter_choice_chance"
-	if previous_choice == "jhon_decides" or previous_choice == "arrest_aniri":
-		branch_event_id = "second_chance_carpenter_choice_jhon"
-	if not await run_location_story_event(branch_event_id, carpenter_cast):
-		return false
-
 	return await run_location_story_event("second_chance_carpenter_conclusion", carpenter_cast)
 
 
@@ -949,6 +999,14 @@ func run_second_chance_healer_return() -> bool:
 		"healer_reward_received",
 		true
 	)
+	MissionManager.update_mission_description(
+		MISSION_ID,
+		"Aniri devolveu os itens roubados e assumiu sua dívida com Jhon. "
+		+ "Ela decidiu acompanhar o grupo e provar que pode seguir um caminho diferente.\n"
+		+ "Pendência: Aniri ainda deve a Jhon.\n"
+		+ "Nova companheira: Aniri — ladina halfling.\n"
+		+ "Recompensa: +3 Poções de Cura."
+	)
 	
 	var progress_was_saved: bool = (
 		SaveManager.save_village_state()
@@ -983,7 +1041,7 @@ func on_location_pressed(
 ) -> void:
 	if bridge_return_running or kasum_event_running or healer_night_running or temple_departure_running:
 		return
-	if is_next_morning() and location_id != "central_square":
+	if is_next_morning() and not is_location_open_in_morning(location_id):
 		return
 	if location_id == "carpenter" and SaveManager.has_completed_story_event(BRIDGE_RETURN_EVENT_ID):
 		return
@@ -1158,7 +1216,7 @@ func on_location_pressed(
 				"Você acompanhará Uiliam ao porão?",
 				[
 					{"id": "accept", "button_text": "Vamos ajudar."},
-					{"id": "question", "button_text": "Por que nós?"}
+					{"id": "question", "button_text": "Primeiro quero saber com o que estamos lidando."}
 				]
 			)
 			if carpenter_choice == "":
@@ -1323,24 +1381,14 @@ func run_second_chance_village_decision() -> bool:
 	):
 		return false
 	
-	var intro_finished: bool = (
-		await run_location_story_event(
-			"second_chance_village_choice_intro",
-			healer_cast
-		)
-	)
-	
-	if not intro_finished:
-		return false
-	
 	var choice_options: Array = [
 		{
 			"id": "acceptance",
-			"button_text": "Você fez besteira, mas está tentando consertar. Isso importa."
+			"button_text": "Você errou, mas está tentando consertar."
 		},
 		{
 			"id": "distrust",
-			"button_text": "Ainda não confio em você. Confiança vai levar tempo."
+			"button_text": "Ainda quero ver se posso confiar em você."
 		}
 	]
 	
@@ -1430,6 +1478,12 @@ func run_second_chance_village_decision() -> bool:
 	
 	if not conclusion_finished:
 		return false
+	if not PartyManager.recruit_npc("Aniri", false):
+		push_warning("Não foi possível registrar Aniri como companheira.")
+		return false
+	if not PartyManager.add_member_to_active_party("Aniri"):
+		push_warning("Não foi possível incluir Aniri na equipe ativa.")
+		return false
 	
 	MissionManager.update_mission_progress(
 		MISSION_ID,
@@ -1478,7 +1532,12 @@ func run_second_chance_village_decision() -> bool:
 	return true
 func on_return_to_village_requested() -> void:
 	if is_instance_valid(status_label):
-		status_label.text = "Amanheceu. Apenas a praça e o caminho para o templo estão disponíveis." if is_next_morning() else "Você retornou à praça da vila."
+		if is_next_morning() and has_started_temple_journey():
+			status_label.text = "A praça e a loja estão abertas. Escolha o próximo destino no mapa do mundo."
+		elif is_next_morning():
+			status_label.text = "Amanheceu. A praça, a loja e o caminho para o templo estão disponíveis."
+		else:
+			status_label.text = "Você retornou à praça da vila."
 	refresh_village_access()
 	
 	var must_start_aniri_decision: bool = (
@@ -1791,8 +1850,8 @@ func start_initial_village_story_event() -> void:
 		MissionManager.start_mission({
 			"id": "world_of_aviant",
 			"title": "O Mundo de Aviant",
-			"description": "Você descobriu a história da Grande Ruptura, dos Cinco Guerreiros e dos Selos de Vanir. As criaturas permanecem além das áreas protegidas e seus números parecem aumentar.",
-			"objective": "Conheça a vila e descubra mais sobre o mundo em que despertou."
+			"description": "Você conheceu a história da Grande Ruptura, dos Cinco Guerreiros e dos Selos de Vanir. Segundo Uiliam, os Selos mantêm as cidades de Aviant protegidas, enquanto as regiões além delas continuam perigosas. O número de criaturas parece estar aumentando.",
+			"objective": "Explore a vila e descubra mais sobre Aviant — e sobre quem você era antes de chegar aqui."
 		})
 	SaveManager.save_village_state()
 	
@@ -2206,7 +2265,9 @@ func run_bridge_return_mayor_event() -> bool:
 			return false
 		story_event_controller.move_to_front()
 		if scene_id == "mission":
-			await story_event_controller.start_event(scene_id, scene)
+			await story_event_controller.start_event(
+				scene_id, scene, BRIDGE_RETURN_CONVERSATION_CAST, "Sir Uiliam"
+			)
 		else:
 			await story_event_controller.start_event(
 				scene_id, scene, MAYOR_CONVERSATION_CAST, "Sir Uiliam"
@@ -2223,6 +2284,9 @@ func run_bridge_return_mayor_event() -> bool:
 	if MissionManager.is_mission_active("aniri_second_chance"):
 		MissionManager.update_mission_progress("aniri_second_chance", "carpenter_debt_pending", false)
 		MissionManager.update_mission_progress("aniri_second_chance", "debt_forgiven", true)
+		MissionManager.update_mission_description(
+			"aniri_second_chance", "Aniri não possui mais dívidas com Jhon."
+		)
 		MissionManager.complete_mission("aniri_second_chance")
 	if not MissionManager.is_mission_active(KASUM_RECRUITMENT_MISSION_ID) and not MissionManager.is_mission_completed(KASUM_RECRUITMENT_MISSION_ID):
 		MissionManager.start_mission({
@@ -2404,7 +2468,9 @@ func play_healer_night_scene(scene_id: String) -> bool:
 	if not is_instance_valid(story_event_controller):
 		return false
 	story_event_controller.move_to_front()
-	await story_event_controller.start_event(scene_id, scene)
+	await story_event_controller.start_event(
+		scene_id, scene, HEALER_NIGHT_CONVERSATION_CAST, "Sir Uiliam"
+	)
 	return true
 
 func begin_healer_night() -> void:
@@ -2457,14 +2523,14 @@ func run_healer_night_event() -> bool:
 			"id": "hero_origin",
 			"title": "Quem Sou Eu?",
 			"category": "personal",
-			"description": "Procure pistas sobre sua origem e descubra como chegou a Aviant."
+			"description": "Há apenas dois dias de lembranças em sua mente. Descubra sua origem e como chegou a Aviant."
 		})
 	if not MissionManager.is_mission_active("aniri_solitude") and not MissionManager.is_mission_completed("aniri_solitude"):
 		MissionManager.start_mission({
 			"id": "aniri_solitude",
 			"title": "Solidão",
 			"category": "companion",
-			"description": "Conheça melhor Aniri e descubra a vida que ela deixou para trás."
+			"description": "Conheça melhor Aniri, seu passado e por que teme voltar a ficar sozinha."
 		})
 	MissionManager.update_mission_progress("hashagur_temple", "rested", true)
 	PartyManager.restore_active_party_after_rest()
@@ -2484,6 +2550,13 @@ func run_healer_night_event() -> bool:
 	return true
 func start_basement_battle() -> void:
 	const BASEMENT_STAGE_NUMBER: int = 2
+	if not MissionManager.is_mission_active("jhon_basement") and not MissionManager.is_mission_completed("jhon_basement"):
+		MissionManager.start_mission({
+			"id": "jhon_basement",
+			"title": "O Porão de Jhon",
+			"description": "Jhon perdeu ferramentas e moedas pouco antes de ratos ocuparem seu porão.",
+			"objective": "Elimine os ratos e encontre as ferramentas desaparecidas."
+		})
 	
 	var battle_was_prepared: bool = (
 		SaveManager.prepare_battle_stage(
@@ -2515,7 +2588,7 @@ func start_basement_battle() -> void:
 		true
 	).timeout
 	
-	get_tree().change_scene_to_file(
+	SceneTransition.change_scene_to_file(
 		"res://Scene/main.tscn"
 	)
 func run_emerald_bridge_mayor_event() -> bool:
@@ -2543,7 +2616,7 @@ func run_emerald_bridge_mayor_event() -> bool:
 		"Como você responderá ao convite para ir à ponte?",
 		[
 			{"id": "help", "button_text": "Eu vou com vocês."},
-			{"id": "payment", "button_text": "Eu posso ajudar. Esse serviço é remunerado?"}
+			{"id": "payment", "button_text": "Esse serviço é remunerado?"}
 		]
 	)
 	if selected_choice != "help" and selected_choice != "payment":
@@ -2574,11 +2647,9 @@ func run_emerald_bridge_mayor_event() -> bool:
 				"id": MISSION_ID,
 				"title": "A Ponte da Esmeralda",
 				"description": (
-					"Jhon foi enviado para reparar a Ponte da Esmeralda "
-					+ "acompanhado por apenas um guarda. A vila não possui "
-					+ "um Selo de proteção e depende de guardas e combatentes "
-					+ "da Ordem. O número de criaturas próximas está aumentando. "
-					+ "Encontre Jhon na ponte e proteja-o durante os reparos."
+					"Jhon foi enviado para reparar a ponte acompanhado por apenas "
+					+ "um guarda. A vila não possui um Selo e os ataques estão "
+					+ "aumentando. Encontre Jhon e proteja-o durante os reparos."
 				),
 				"progress": {
 					"mayor_briefing_completed": true,
@@ -2649,6 +2720,6 @@ func start_emerald_bridge_battle() -> void:
 		true
 	).timeout
 	
-	get_tree().change_scene_to_file(
+	SceneTransition.change_scene_to_file(
 		"res://Scene/main.tscn"
 	)

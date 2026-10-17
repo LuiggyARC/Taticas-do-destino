@@ -9,12 +9,6 @@ const POWERS := [
 		"description": "Prepare um ataque corpo a corpo que causa +1 de dano."
 	},
 	{
-		"id": "barbarian_rage",
-		"name": "Fúria",
-		"frequency": "Por encontro",
-		"description": "Entre em Fúria. Recupera os usos no próximo combate."
-	},
-	{
 		"id": "barbarian_decisive",
 		"name": "Golpe Decisivo",
 		"frequency": "Diário",

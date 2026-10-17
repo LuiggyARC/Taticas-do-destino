@@ -111,7 +111,8 @@ func update_display(
 	hero_unit: Node2D,
 	current_battle_turn: int,
 	allied_units: Array = [],
-	bard_song_rounds_remaining: int = 0
+	bard_song_rounds_remaining: int = 0,
+	combat_advantage_targets: Array[String] = []
 ) -> void:
 	if not is_instance_valid(panel):
 		return
@@ -134,6 +135,8 @@ func update_display(
 		current_enemy,
 		current_battle_turn
 	)
+	for target_name in combat_advantage_targets:
+		lines.append("%s: Flanqueado | concede Vantagem de Combate (+2; furtivo)" % target_name)
 	
 	append_hero_effect_lines(
 		lines,

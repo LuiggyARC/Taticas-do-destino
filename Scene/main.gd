@@ -53,12 +53,14 @@ const ActiveSpellAreaOverlayScript := preload(
 const TacticalBoardOverlayScript := preload(
 	"res://Scene/tactical_board_overlay.gd"
 )
+const EnemyIntentOverlayScript := preload("res://Scene/enemy_intent_overlay.gd")
 const BattlefieldRendererScript := preload(
 	"res://Scene/battlefield_renderer.gd"
 )
 const CombatAttackResolverScript := preload(
 	"res://Scene/combat_attack_resolver.gd"
 )
+const FlankingRulesScript := preload("res://Scene/flanking_rules.gd")
 const ScenarioWeatherScript := preload(
 	"res://Scene/scenario_weather.gd"
 )
@@ -154,6 +156,10 @@ var combat_feedback: Node
 var current_grid_width: int = GRID_WIDTH
 var current_grid_height: int = GRID_HEIGHT
 var tactical_board_overlay: Node
+var enemy_intent_overlay: Node2D
+var enemy_intent_button: Button
+var enemy_intents_enabled: bool = true
+var enemy_intent_refresh_timer: float = 0.0
 var battlefield_renderer: Node
 
 var rogue_was_spotted: bool = false
@@ -181,8 +187,13 @@ var board_pixel_size: float = GRID_WIDTH * TILE_SIZE
 var is_movement_animating: bool = false
 var opportunity_warning_open: bool = false
 var movement_step_duration: float = 0.12
+var pending_movement_unit: Node2D
+var pending_movement_destination: Vector2i = Vector2i(-1, -1)
+var movement_preview_panel: PanelContainer
+var movement_preview_label: Label
 
 var battle_xp_gained: int = 0
+var battle_pending_member_xp: Dictionary = {}
 var battle_gold_gained: int = 0
 var battle_enemies_defeated: int = 0
 
@@ -220,6 +231,8 @@ var tutorial_movement_target: Vector2i = Vector2i(-1, -1)
 var stage_one_tutorial_phase: String = ""
 var stage_one_ai_tutorial_shown: bool = false
 var stage_one_ally_tutorial_shown: bool = false
+var stage_two_tutorial_enabled: bool = false
+var stage_two_tutorial_shown: bool = false
 
 var waiting_spell_target: bool = false
 var pending_spell_name: String = ""
@@ -300,22 +313,38 @@ func write_manual_save_slot(slot_number: int) -> void:
 	sync_hero_to_game_state()
 	InventoryManager.set_gold(GameState.hero_gold)
 	PartyManager.sync_hero_from_game_state()
-	if is_instance_valid(hero):
-		PartyManager.update_member(PartyManager.HERO_MEMBER_ID, {
-			"current_hp": hero.hp,
-			"max_hp": hero.max_hp,
-			"level": hero.level,
-			"total_xp": hero.total_xp
-		})
-	var source_path: String = GameState.selected_save_path.strip_edges()
-	var save_data: Dictionary = {}
-	if source_path != "":
-		save_data = SaveManager.read_save_data(source_path)
+	sync_battle_party_resources()
+	var source_path: String = SaveManager.get_active_save_path()
+	var save_data: Dictionary = SaveManager.read_save_data(source_path)
+	if save_data.is_empty():
+		push_warning("Não é possível salvar durante a batalha sem um save anterior.")
+		return
+	var committed_presets: Dictionary = save_data.get("player_presets", {})
+	var committed_party: Dictionary = save_data.get("party", {})
+	var committed_members: Dictionary = committed_party.get("members", {})
+	var player_presets: Dictionary = get_player_save_data()
+	# XP obtida durante o combate só passa ao save quando a vitória é confirmada.
+	player_presets["hero_total_xp"] = int(committed_presets.get("hero_total_xp", player_presets["hero_total_xp"]))
+	player_presets["hero_xp_to_next_level"] = int(committed_presets.get("hero_xp_to_next_level", player_presets["hero_xp_to_next_level"]))
+	var party_data: Dictionary = PartyManager.get_save_data()
+	var party_members: Dictionary = party_data.get("members", {})
+	for member_id in party_members:
+		var member: Dictionary = party_members[member_id]
+		var committed_member: Dictionary = committed_members.get(member_id, {})
+		if member_id == PartyManager.HERO_MEMBER_ID:
+			member["total_xp"] = player_presets["hero_total_xp"]
+			member["xp_to_next_level"] = player_presets["hero_xp_to_next_level"]
+		elif not committed_member.is_empty():
+			for key in ["total_xp", "xp_to_next_level", "pending_level_ups"]:
+				if committed_member.has(key):
+					member[key] = committed_member[key]
+		party_members[member_id] = member
+	party_data["members"] = party_members
 	save_data["save_type"] = "manual"
 	save_data["current_stage"] = current_stage
 	save_data["current_location"] = "battle"
-	save_data["player_presets"] = get_player_save_data()
-	save_data["party"] = PartyManager.get_save_data()
+	save_data["player_presets"] = player_presets
+	save_data["party"] = party_data
 	save_data["inventory"] = InventoryManager.get_save_data()
 	save_data["missions"] = MissionManager.get_save_data()
 	save_data["saved_at"] = Time.get_datetime_string_from_system()
@@ -350,31 +379,7 @@ func save_auto_game(
 	)
 
 	PartyManager.sync_hero_from_game_state()
-
-	if is_instance_valid(hero):
-		PartyManager.update_member(
-			PartyManager.HERO_MEMBER_ID,
-			{
-				"current_hp": hero.hp,
-				"max_hp": hero.max_hp,
-				"level": hero.level,
-				"total_xp": hero.total_xp,
-				"known_spells":
-					hero.known_spells.duplicate(true),
-				"spell_slots_level_0":
-					hero.spell_slots_level_0,
-				"spell_slots_level_1":
-					hero.spell_slots_level_1,
-				"spell_slots_level_2":
-					hero.spell_slots_level_2,
-				"max_spell_slots_level_0":
-					hero.max_spell_slots_level_0,
-				"max_spell_slots_level_1":
-					hero.max_spell_slots_level_1,
-				"max_spell_slots_level_2":
-					hero.max_spell_slots_level_2
-			}
-		)
+	sync_battle_party_resources()
 
 	var source_save_path: String = (
 		GameState.selected_save_path.strip_edges()
@@ -441,6 +446,30 @@ func save_auto_game(
 	)
 
 	return true
+
+func sync_battle_party_resources() -> void:
+	if is_instance_valid(hero):
+		PartyManager.update_member(PartyManager.HERO_MEMBER_ID, {
+			"current_hp": hero.hp,
+			"max_hp": hero.max_hp,
+			"level": hero.level,
+			"total_xp": hero.total_xp,
+			"known_spells": hero.known_spells.duplicate(true),
+			"spell_slots_level_0": hero.spell_slots_level_0,
+			"spell_slots_level_1": hero.spell_slots_level_1,
+			"spell_slots_level_2": hero.spell_slots_level_2,
+			"max_spell_slots_level_0": hero.max_spell_slots_level_0,
+			"max_spell_slots_level_1": hero.max_spell_slots_level_1,
+			"max_spell_slots_level_2": hero.max_spell_slots_level_2
+		})
+	for npc_unit in npcs:
+		if not is_instance_valid(npc_unit) or not PartyManager.has_member(str(npc_unit.npc_id)):
+			continue
+		PartyManager.update_member(str(npc_unit.npc_id), {
+			"current_hp": npc_unit.hp,
+			"max_hp": npc_unit.max_hp,
+			"daily_powers_used": npc_unit.daily_powers_used.duplicate()
+		})
 	
 func load_progress():
 	var save_path: String = (
@@ -764,7 +793,7 @@ func restore_saved_mission_state() -> void:
 func _ready():
 	if (
 		GameState.should_load_save
-		and GameState.current_location in ["village", "temple_road"]
+		and GameState.current_location in ["village", "temple_road", "temple_gate", "temple_hall", "citadel"]
 	):
 		load_progress()
 		restore_saved_inventory_and_party_state()
@@ -777,12 +806,17 @@ func _ready():
 				1.0
 			)
 
-		var destination_scene: String = (
-			"res://Scene/temple_road.tscn"
-			if GameState.current_location == "temple_road"
-			else "res://Scene/village.tscn"
-		)
-		get_tree().change_scene_to_file(destination_scene)
+		var destination_scene: String = "res://Scene/village.tscn"
+		match GameState.current_location:
+			"temple_road":
+				destination_scene = "res://Scene/temple_road.tscn"
+			"temple_gate":
+				destination_scene = "res://Scene/temple_gate.tscn"
+			"temple_hall":
+				destination_scene = "res://Scene/temple_hall.tscn"
+			"citadel":
+				destination_scene = "res://Scene/citadel_stealth.tscn"
+		SceneTransition.change_scene_to_file(destination_scene)
 
 		return
 
@@ -805,6 +839,7 @@ func _ready():
 	create_game_camera()
 	create_grid_layer()
 	create_movement_layer()
+	create_enemy_intent_overlay()
 	create_spell_target_layer()
 	create_active_spell_area_layer()
 	create_attack_area_layer()
@@ -832,6 +867,7 @@ func _ready():
 		GameState.should_load_save
 	)
 	stage_one_tutorial_enabled = not loading_saved_game
+	stage_two_tutorial_enabled = not SaveManager.has_completed_story_event("basement_tactical_tutorial_seen")
 
 	if loading_saved_game:
 		load_progress()
@@ -945,6 +981,64 @@ func get_tactical_board_overlay() -> Node:
 	
 	return tactical_board_overlay
 
+func create_enemy_intent_overlay() -> void:
+	if is_instance_valid(enemy_intent_overlay):
+		enemy_intent_overlay.queue_free()
+	enemy_intent_overlay = EnemyIntentOverlayScript.new()
+	enemy_intent_overlay.setup(TILE_SIZE)
+	enemy_intent_overlay.visible = false
+	if is_instance_valid(board_root):
+		board_root.add_child(enemy_intent_overlay)
+	else:
+		add_child(enemy_intent_overlay)
+
+func get_predicted_enemy_targets() -> Array[Dictionary]:
+	var predictions: Array[Dictionary] = []
+	var candidates: Array[Node2D] = []
+	for candidate in enemies:
+		if is_instance_valid(candidate) and not candidates.has(candidate):
+			candidates.append(candidate)
+	if is_instance_valid(enemy) and not candidates.has(enemy):
+		candidates.append(enemy)
+	for candidate in candidates:
+		if candidate.hp <= 0 or not candidate.visible:
+			continue
+		var target: Node2D = EnemyAI.choose_target(candidate, self)
+		if not is_instance_valid(target) or target.hp <= 0 or not target.visible:
+			continue
+		var weapon_range: float = EnemyAI.get_weapon_range(candidate)
+		predictions.append({
+			"enemy": candidate,
+			"target": target,
+			"in_range": get_distance_in_meters(candidate.grid_position, target.grid_position) <= weapon_range
+		})
+	return predictions
+
+func refresh_enemy_intent_overlay() -> void:
+	if not is_instance_valid(enemy_intent_overlay) or not is_instance_valid(board_root):
+		return
+	var should_show: bool = (
+		enemy_intents_enabled
+		and initiative_started
+		and not battle_finished
+		and current_turn == TurnState.HERO_TURN
+		and not scenario_intro_running
+		and not (is_instance_valid(story_dialog_popup) and story_dialog_popup.visible)
+	)
+	enemy_intent_overlay.visible = should_show
+	if not should_show:
+		return
+	var arrows: Array[Dictionary] = []
+	for prediction in get_predicted_enemy_targets():
+		var attacker: Node2D = prediction["enemy"]
+		var target: Node2D = prediction["target"]
+		arrows.append({
+			"source": board_root.to_local(attacker.global_position),
+			"target": board_root.to_local(target.global_position),
+			"in_range": prediction["in_range"]
+		})
+	enemy_intent_overlay.set_intents(arrows)
+
 func create_movement_layer() -> void:
 	get_tactical_board_overlay()
 
@@ -975,9 +1069,11 @@ func create_ui() -> void:
 	create_turn_counter_label()
 	create_active_effects_panel()
 	create_battle_zoom_controls()
+	create_enemy_intent_toggle_button()
 	create_character_sheet_panel()
 	create_battle_unit_hud()
 	create_action_panel()
+	create_movement_preview_panel()
 	create_battle_tutorial()
 	create_abandon_popup()
 	create_manual_save_popups()
@@ -1027,8 +1123,39 @@ func on_tutorial_step_changed(target_name: String) -> void:
 			focus_unit = current_active_unit if is_instance_valid(current_active_unit) and current_active_unit != hero else animal_companion
 		"hero":
 			focus_unit = hero
+		"frontliner":
+			focus_unit = find_scenario_npc_by_id("Sr Uiliam")
+		"dire_rat":
+			for candidate in enemies:
+				if is_instance_valid(candidate) and candidate.hp > 0 and get_unit_display_name(candidate).begins_with("Rato Atroz"):
+					focus_unit = candidate
+					break
 	if is_instance_valid(focus_unit):
 		center_camera_on_unit(focus_unit)
+
+func show_stage_two_tactical_tutorial() -> void:
+	if current_stage != 2 or not stage_two_tutorial_enabled or stage_two_tutorial_shown:
+		return
+	if not is_instance_valid(battle_tutorial_controller):
+		return
+	stage_two_tutorial_shown = true
+	var steps: Array[Dictionary] = [
+		{
+			"title": "Proteja a retaguarda",
+			"text": "Coloque combatentes como Sir Uiliam à frente: mais pontos de vida e uma CA maior ajudam a suportar os golpes. Deixe aliados mais frágeis atrás deles.",
+			"target": "frontliner"
+		},
+		{
+			"title": "Flanqueie o Rato Atroz",
+			"text": "O Rato Atroz tem CA 16. Coloque dois aliados adjacentes em lados opostos dele: o rato ficará Flanqueado e concederá Vantagem de Combate. Enquanto isso durar, todos os aliados recebem +2 para acertá-lo, mesmo à distância. Ladinos também podem usar ataque furtivo.",
+			"target": "dire_rat"
+		}
+	]
+	battle_tutorial_controller.start_tutorial(steps, Callable(self, "get_tutorial_target_rect"))
+	await battle_tutorial_controller.closed
+	SaveManager.mark_story_event_completed("basement_tactical_tutorial_seen")
+	if is_instance_valid(hero):
+		center_camera_on_unit(hero)
 
 func show_stage_one_initiative_tutorial() -> void:
 	if not is_instance_valid(battle_tutorial_controller):
@@ -1079,7 +1206,7 @@ func begin_stage_one_guided_tutorial() -> void:
 	show_stage_one_guided_step(
 		"movement",
 		"Passo 1 — Mova seu herói",
-		"As casas azuis mostram até onde você pode andar neste turno. Toque em uma casa azul para mover seu herói na direção de um goblin. O número de metros restantes aparece no painel de ações.",
+		"As casas azuis mostram até onde você pode andar neste turno. Toque uma vez numa casa para ver o caminho e o custo; toque de novo na mesma casa para mover seu herói. O movimento restante aparece no painel de ações.",
 		"movement_area"
 	)
 
@@ -1170,7 +1297,7 @@ func show_stage_one_ally_tutorial(unit: Node2D) -> void:
 	stage_one_ally_tutorial_shown = true
 	show_stage_one_guided_tip(
 		"Seu outro personagem jogável",
-		"Agora é o turno de %s. Você controla este aliado: use as casas azuis para movê-lo e toque em um inimigo ao alcance para atacar. Cada personagem tem sua própria vida, movimento e ação; veja quem está ativo na faixa de turnos." % get_unit_display_name(unit),
+		"Agora é o turno de %s. Você controla este aliado: toque numa casa azul para ver o caminho e toque novamente para movê-lo. Toque num inimigo ao alcance para atacar. Cada personagem tem sua própria vida, movimento e ação; veja quem está ativo na faixa de turnos." % get_unit_display_name(unit),
 		"player_ally"
 	)
 
@@ -1190,7 +1317,8 @@ func show_stage_one_battle_tutorial() -> void:
 	var steps: Array[Dictionary] = [
 		{"title": "Ordem dos turnos", "text": "Esta faixa mostra quem vai agir em seguida. O nome destacado é a unidade do turno atual.", "target": "turn_order"},
 		{"title": "Seu personagem", "text": "O quadro no alto à esquerda mostra o retrato, os pontos de vida e a defesa do personagem. Toque em Ver ficha para abrir os detalhes.", "target": "unit_hud"},
-		{"title": "Mover", "text": "Toque numa casa azul para andar com segurança. Uma casa laranja com ! é perigosa: ao tentar ir até ela, você sai do alcance de um inimigo próximo. Ele pode atacar antes de você andar.", "target": "movement_area"},
+		{"title": "Mover", "text": "Toque numa casa azul para ver o caminho e o custo. Toque novamente na mesma casa para confirmar. A casa laranja com ! indica que um inimigo pode atacar antes de você andar; a prévia mostrará quem é.", "target": "movement_area"},
+		{"title": "Alvos prováveis", "text": "As setas apontam para quem cada inimigo pretende atacar. Vermelho indica alvo no alcance da arma; dourado indica que o inimigo precisa se aproximar. A IA pode mudar de ideia após um movimento. Toque em Alvos para ocultar ou mostrar as setas.", "target": "enemy_intents"},
 		{"title": "Atacar", "text": "A área vermelha da arma aparece somente quando há um inimigo ao alcance. Aproxime-se ou espere que ele se aproxime; então toque nele para atacar. Magias mostram um alcance separado.", "target": attack_tutorial_target},
 		{"title": "Aliado da IA", "text": "O Guarda Aliado é amigo, mas age sozinho quando chegar sua vez. Você não pode decidir para onde ele anda ou quem ataca.", "target": "ai_ally"},
 		{"title": "Aliado controlável", "text": "Quando um aliado controlável entrar no grupo, como um companheiro animal ou um personagem de outra missão, você decidirá as ações dele no turno próprio. Verde indica aliado; a faixa de iniciativa mostra de quem é a vez.", "target": "player_ally"},
@@ -1201,7 +1329,7 @@ func show_stage_one_battle_tutorial() -> void:
 	if is_instance_valid(hero) and not hero.known_spells.is_empty():
 		steps.append({"title": "Magias", "text": "Abra o grimório para ver as magias conhecidas. Escolha uma magia e, quando solicitado, toque no alvo ou na área do mapa. Magias de nível maior gastam usos.", "target": "magic"})
 	steps.append({"title": "Itens", "text": "Toque em Itens para usar uma poção de cura que você tenha encontrado ou comprado. Usar uma poção gasta a ação de ataque da unidade neste turno.", "target": "items"})
-	steps.append({"title": "Ataque de oportunidade", "text": "Exemplo: se um goblin está ao seu lado e você tenta se afastar, ele ganha um golpe gratuito ANTES do seu movimento. A casa laranja com ! avisa esse risco. Toque nela para ver quem atacará; você pode cancelar. Arcos não fazem esse ataque.", "target": "enemy"})
+	steps.append({"title": "Ataque de oportunidade", "text": "Exemplo: se um goblin está ao seu lado e você tenta se afastar, ele ganha um golpe gratuito ANTES do seu movimento. A casa laranja com ! avisa esse risco. Toque nela para ver quem atacará; confirme só se aceitar o risco. Arcos não fazem esse ataque.", "target": "enemy"})
 	steps.append({"title": "Efeitos ativos", "text": "Aqui aparecem fúria, venenos, magias em andamento e outros efeitos com duração. 'Nenhum' significa que não há efeitos ativos agora.", "target": "effects"})
 	steps.append({"title": "Resultados das ações", "text": "Esta caixa mostra a rolagem do dado, os bônus, a defesa do alvo, se o golpe acertou e quanto dano causou. Também informa os resultados de magias. Ela aparece brevemente no canto inferior direito.", "target": "results"})
 	steps.append({"title": "Opções da batalha", "text": "A engrenagem abre Salvar e Abandonar. Neste primeiro cenário, a opção Ajuda permite rever este tutorial.", "target": "battle_menu"})
@@ -1267,6 +1395,8 @@ func get_tutorial_target_rect(target_name: String) -> Variant:
 		"battle_menu":
 			if is_instance_valid(combat_action_panel_controller):
 				control = combat_action_panel_controller.gear_button
+		"enemy_intents":
+			control = enemy_intent_button
 		"class_skill":
 			if is_instance_valid(combat_action_panel_controller):
 				control = combat_action_panel_controller.class_skill_button
@@ -1303,6 +1433,13 @@ func get_tutorial_target_rect(target_name: String) -> Variant:
 					break
 		"player_ally":
 			unit = current_active_unit if is_instance_valid(current_active_unit) and current_active_unit != hero else animal_companion
+		"frontliner":
+			unit = find_scenario_npc_by_id("Sr Uiliam")
+		"dire_rat":
+			for candidate in enemies:
+				if is_instance_valid(candidate) and candidate.hp > 0 and get_unit_display_name(candidate).begins_with("Rato Atroz"):
+					unit = candidate
+					break
 	if is_instance_valid(unit):
 		var point: Vector2 = unit.get_global_transform_with_canvas().origin
 		var screen_size: Vector2 = get_viewport_rect().size
@@ -1463,6 +1600,7 @@ func show_movement_area():
 		)
 
 func clear_movement_area() -> void:
+	clear_pending_movement_preview()
 	var overlay: Node = (
 		get_tactical_board_overlay()
 	)
@@ -1471,6 +1609,87 @@ func clear_movement_area() -> void:
 		return
 	
 	overlay.clear_movement_tiles()
+
+func create_movement_preview_panel() -> void:
+	if not is_instance_valid(ui_layer):
+		return
+	movement_preview_panel = PanelContainer.new()
+	movement_preview_panel.name = "MovementPreviewPanel"
+	movement_preview_panel.anchor_left = 0.24
+	movement_preview_panel.anchor_right = 0.76
+	movement_preview_panel.anchor_top = 1.0
+	movement_preview_panel.anchor_bottom = 1.0
+	movement_preview_panel.offset_top = -260.0
+	movement_preview_panel.offset_bottom = -150.0
+	movement_preview_panel.visible = false
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.025, 0.04, 0.05, 0.96)
+	style.border_color = Color(0.24, 0.80, 1.0)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	style.set_content_margin_all(10)
+	movement_preview_panel.add_theme_stylebox_override("panel", style)
+	ui_layer.add_child(movement_preview_panel)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	movement_preview_panel.add_child(row)
+	movement_preview_label = Label.new()
+	movement_preview_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	movement_preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	movement_preview_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	movement_preview_label.add_theme_font_size_override("font_size", 17)
+	movement_preview_label.add_theme_color_override("font_color", Color.WHITE)
+	row.add_child(movement_preview_label)
+	var cancel_button := Button.new()
+	cancel_button.text = "Cancelar"
+	cancel_button.custom_minimum_size = Vector2(92, 48)
+	cancel_button.pressed.connect(clear_pending_movement_preview)
+	row.add_child(cancel_button)
+
+func clear_pending_movement_preview() -> void:
+	var had_preview: bool = is_instance_valid(pending_movement_unit)
+	pending_movement_unit = null
+	pending_movement_destination = Vector2i(-1, -1)
+	if is_instance_valid(movement_preview_panel):
+		movement_preview_panel.visible = false
+	if had_preview:
+		clear_path_preview_tiles()
+
+func show_pending_movement_preview(unit: Node2D, destination: Vector2i) -> void:
+	if pending_movement_destination != destination or pending_movement_unit != unit:
+		clear_pending_movement_preview()
+	if not can_player_unit_move_to(unit, destination):
+		return
+	var available: float = float(unit.current_movement_meters)
+	var path: Array[Vector2i] = get_grid_path_avoiding_units(
+		unit.grid_position, destination, unit, available, true
+	)
+	if path.is_empty():
+		show_floating_text_on_unit(unit, "SEM CAMINHO", 20, "miss")
+		return
+	var cost: float = get_path_total_cost(unit.grid_position, path)
+	if cost > available:
+		show_floating_text_on_unit(unit, "SEM MOVIMENTO", 20, "miss")
+		return
+	var attackers: Array[Node2D] = get_opportunity_attackers_for_move(unit, destination)
+	var threat_names: Array[String] = []
+	for attacker in attackers:
+		threat_names.append(get_unit_display_name(attacker))
+	pending_movement_unit = unit
+	pending_movement_destination = destination
+	show_path_preview(path, not threat_names.is_empty())
+	if is_instance_valid(movement_preview_label):
+		if threat_names.is_empty():
+			movement_preview_label.text = "Mover: %.1f m de %.1f m disponíveis. Caminho amarelo seguro. Toque novamente na casa para confirmar." % [cost, available]
+			movement_preview_label.add_theme_color_override("font_color", Color.WHITE)
+		else:
+			movement_preview_label.text = "PERIGO: %s atacará antes do movimento! Custo: %.1f/%.1f m. Toque novamente na casa para continuar." % [", ".join(threat_names), cost, available]
+			movement_preview_label.add_theme_color_override("font_color", Color(1.0, 0.77, 0.45))
+	if is_instance_valid(movement_preview_panel):
+		movement_preview_panel.visible = true
+		var preview_style: StyleBoxFlat = movement_preview_panel.get_theme_stylebox("panel").duplicate() as StyleBoxFlat
+		preview_style.border_color = Color(1.0, 0.52, 0.18) if not threat_names.is_empty() else Color(0.24, 0.80, 1.0)
+		movement_preview_panel.add_theme_stylebox_override("panel", preview_style)
 
 func end_hero_turn():
 	await end_active_unit_turn()
@@ -1994,6 +2213,10 @@ func enemy_turn():
 	
 	if is_current_enemy_unable_to_act():
 		return
+	if enemy.control_effect_name == "Sono" and enemy.has_active_control_effect(battle_turn_count):
+		show_floating_text_on_unit(enemy, "DORMINDO", 22, "miss")
+		update_active_effects_panel()
+		return
 	
 	var advanced_action: Dictionary = (
 		get_enemy_advanced_ai_action(
@@ -2148,8 +2371,13 @@ func opportunity_attack(
 ) -> void:
 	if not is_instance_valid(attacker):
 		return
+	if is_enemy_unit(attacker) and attacker.has_method("has_active_control_effect"):
+		if attacker.control_effect_name == "Sono" and attacker.has_active_control_effect(battle_turn_count):
+			return
 	
 	if not is_instance_valid(target):
+		return
+	if target.hp <= 0 or not target.visible:
 		return
 	
 	if battle_finished:
@@ -2455,6 +2683,8 @@ func check_opportunity_attack(mover: Node2D, defender: Node2D, new_position: Vec
 func would_provoke_opportunity_attack(mover: Node2D, defender: Node2D, new_position: Vector2i) -> bool:
 	if not is_instance_valid(mover):
 		return false
+	if mover.hp <= 0 or not mover.visible:
+		return false
 	
 	if not is_instance_valid(defender):
 		return false
@@ -2509,6 +2739,7 @@ func start_stage(
 	setup_scenario_weather()
 	
 	battle_xp_gained = 0
+	battle_pending_member_xp.clear()
 	battle_gold_gained = 0
 	battle_enemies_defeated = 0
 	
@@ -2656,7 +2887,6 @@ func reset_stage_units(stage_number: int):
 	
 	if stage_number == 1:
 		hero.grid_position = Vector2i(7, 7)
-		hero.hp = hero.max_hp
 		hero.current_movement_meters = hero.max_movement_meters
 		hero.has_attacked = false
 		hero.has_opportunity_attacked = false
@@ -2670,7 +2900,6 @@ func reset_stage_units(stage_number: int):
 	
 	elif stage_number == 2:
 		hero.grid_position = Vector2i(2, 7)
-		hero.hp = hero.max_hp
 		hero.current_movement_meters = hero.max_movement_meters
 		hero.has_attacked = false
 		hero.has_opportunity_attacked = false
@@ -2809,7 +3038,7 @@ func abandon_game() -> void:
 		true
 	).timeout
 	
-	get_tree().change_scene_to_file(
+	SceneTransition.change_scene_to_file(
 		"res://Scene/main.tscn"
 	)
 	
@@ -2886,7 +3115,7 @@ func can_hero_sneak_attack_enemy() -> bool:
 		return false
 	
 	if is_enemy_flanked():
-		print("Ataque furtivo permitido: inimigo flanqueado.")
+		print("Ataque furtivo permitido: alvo com Vantagem de Combate.")
 		return true
 	
 	if hero.is_hidden and hero.enemy_is_surprised and not rogue_was_spotted:
@@ -2894,7 +3123,7 @@ func can_hero_sneak_attack_enemy() -> bool:
 		return true
 	
 	print("Ataque furtivo não permitido.")
-	print("Flanqueado: ", is_enemy_flanked())
+	print("Vantagem de Combate: ", is_enemy_flanked())
 	print("Escondido: ", hero.is_hidden)
 	print("Inimigo surpreso: ", hero.enemy_is_surprised)
 	print("Ladino percebido: ", rogue_was_spotted)
@@ -2902,6 +3131,7 @@ func can_hero_sneak_attack_enemy() -> bool:
 	return false
 	
 func use_class_skill():
+	clear_pending_movement_preview()
 	var unit: Node2D = get_acting_unit()
 	
 	if not is_instance_valid(unit):
@@ -4542,6 +4772,8 @@ func create_action_panel() -> void:
 			self,
 			"use_class_skill"
 		),
+		"hide": Callable(self, "use_combat_hide"),
+		"rage": Callable(self, "use_combat_rage"),
 		"magic": Callable(
 			self,
 			"open_spell_menu"
@@ -4582,6 +4814,7 @@ func create_action_panel() -> void:
 	update_movement_label()
 
 func open_battle_items_menu() -> void:
+	clear_pending_movement_preview()
 	if not initiative_started or battle_finished or current_turn != TurnState.HERO_TURN:
 		return
 	if waiting_spell_target:
@@ -4899,6 +5132,7 @@ func check_battle_result() -> void:
 		
 		clear_movement_area()
 		clear_attack_area()
+		commit_battle_experience()
 		
 		var special_victory_was_played: bool = await (
 			play_scenario_victory_sequence()
@@ -5131,7 +5365,7 @@ func on_victory_confirmed() -> void:
 		MusicManage.fade_out_music(0.8)
 		await get_tree().create_timer(0.85, true).timeout
 	
-	get_tree().change_scene_to_file(
+	SceneTransition.change_scene_to_file(
 		"res://Scene/village.tscn"
 		if bridge_was_completed
 		else "res://Scene/main_menu.tscn"
@@ -5157,7 +5391,7 @@ func on_defeat_confirmed() -> void:
 			"Nenhum save foi encontrado para restaurar."
 		)
 		
-		get_tree().change_scene_to_file(
+		SceneTransition.change_scene_to_file(
 			"res://Scene/main_menu.tscn"
 		)
 		
@@ -5174,7 +5408,7 @@ func on_defeat_confirmed() -> void:
 			"O último save está vazio ou não pôde ser lido."
 		)
 		
-		get_tree().change_scene_to_file(
+		SceneTransition.change_scene_to_file(
 			"res://Scene/main_menu.tscn"
 		)
 		
@@ -5207,7 +5441,7 @@ func on_defeat_confirmed() -> void:
 	# durante a tela de derrota.
 	get_tree().paused = false
 	
-	get_tree().change_scene_to_file(
+	SceneTransition.change_scene_to_file(
 		"res://Scene/main.tscn"
 	)
 
@@ -5273,9 +5507,13 @@ func update_enemy_control_effects_turn() -> void:
 	
 	update_active_effects_panel()
 
-func _process(_delta):
+func _process(delta):
 	update_manual_camera_control()
 	update_camera_follow()
+	enemy_intent_refresh_timer -= delta
+	if enemy_intent_refresh_timer <= 0.0:
+		enemy_intent_refresh_timer = 0.12
+		refresh_enemy_intent_overlay()
 	
 func clear_old_ui() -> void:
 	var nodes_to_remove := [
@@ -5320,6 +5558,8 @@ func update_class_skill_button() -> void:
 		true,
 		""
 	)
+	combat_action_panel_controller.configure_hide_button(false, true)
+	combat_action_panel_controller.configure_rage_button(false, true)
 	
 	var unit: Node2D = get_acting_unit()
 	
@@ -5336,6 +5576,16 @@ func update_class_skill_button() -> void:
 	var unit_class: String = get_unit_class_name(
 		unit
 	)
+	if unit_class == "Ladino":
+		combat_action_panel_controller.configure_hide_button(
+			true,
+			not initiative_started or battle_finished or current_turn != TurnState.HERO_TURN or not unit.can_use_hide_skill()
+		)
+	elif unit_class == "Bárbaro":
+		combat_action_panel_controller.configure_rage_button(
+			true,
+			not initiative_started or battle_finished or current_turn != TurnState.HERO_TURN or not unit.can_use_rage()
+		)
 	
 	var skill_labels: Dictionary = {
 		"Bárbaro": "Habilidades",
@@ -5367,6 +5617,22 @@ func update_class_skill_button() -> void:
 		button_disabled,
 		button_text
 	)
+
+func use_combat_hide() -> void:
+	if not initiative_started or battle_finished or current_turn != TurnState.HERO_TURN:
+		return
+	clear_pending_movement_preview()
+	var unit: Node2D = get_acting_unit()
+	if is_instance_valid(unit) and can_select_rogue_power(unit, "rogue_hide"):
+		select_rogue_power(unit, "rogue_hide")
+
+func use_combat_rage() -> void:
+	if not initiative_started or battle_finished or current_turn != TurnState.HERO_TURN:
+		return
+	clear_pending_movement_preview()
+	var unit: Node2D = get_acting_unit()
+	if is_instance_valid(unit) and can_select_barbarian_power(unit, "barbarian_rage"):
+		select_barbarian_power(unit, "barbarian_rage")
 
 func use_barbarian_rage():
 	if not is_instance_valid(hero):
@@ -5477,26 +5743,74 @@ func check_hidden_rogue_perception(rogue: Node2D) -> void:
 
 	update_class_skill_button()
 func is_enemy_flanked() -> bool:
-	if not is_instance_valid(enemy):
-		return false
-	
-	var allies: Array = get_hero_allies_near_enemy()
-	return allies.size() > 0
+	return has_combat_advantage_condition(enemy)
 
 func is_target_flanked_by_ally(target_unit: Node2D, attacker: Node2D) -> bool:
-	if not is_instance_valid(target_unit):
+	return is_living_player_ally(attacker) and has_combat_advantage_condition(target_unit)
+
+func is_living_player_ally(unit: Node2D) -> bool:
+	if not is_instance_valid(unit) or ("hp" in unit and unit.hp <= 0):
 		return false
-	var allied_units: Array = get_tree().get_nodes_in_group("player_allies")
-	if is_instance_valid(hero) and not allied_units.has(hero):
-		allied_units.append(hero)
-	for ally_unit in allied_units:
-		if not is_instance_valid(ally_unit) or ally_unit == attacker or ally_unit == target_unit:
-			continue
-		if "hp" in ally_unit and ally_unit.hp <= 0:
-			continue
-		if get_distance_in_meters(ally_unit.grid_position, target_unit.grid_position) <= 1.5:
+	if unit == hero or unit == animal_companion:
+		return true
+	for npc_unit in npcs:
+		if npc_unit == unit and is_instance_valid(npc_unit) and str(npc_unit.faction) == "ally":
 			return true
 	return false
+
+func is_living_enemy_unit(unit: Node2D) -> bool:
+	if not is_instance_valid(unit) or not is_enemy_unit(unit):
+		return false
+	return "hp" not in unit or unit.hp > 0
+
+func has_combat_advantage_condition(target_unit: Node2D) -> bool:
+	# Controle também concede vantagem; flanqueio desaparece se alguém sair ou cair.
+	if not is_instance_valid(target_unit):
+		return false
+	if "hp" in target_unit and target_unit.hp <= 0:
+		return false
+	if is_enemy_unit(target_unit) and target_unit.has_method("has_active_control_effect"):
+		if target_unit.has_active_control_effect(battle_turn_count):
+			return true
+	var flanking_units: Array[Node2D] = []
+	if is_enemy_unit(target_unit):
+		if is_living_player_ally(hero):
+			flanking_units.append(hero)
+		if is_living_player_ally(animal_companion):
+			flanking_units.append(animal_companion)
+		for npc_unit in npcs:
+			if is_living_player_ally(npc_unit):
+				flanking_units.append(npc_unit)
+	elif is_living_player_ally(target_unit):
+		for enemy_unit in enemies:
+			if is_living_enemy_unit(enemy_unit):
+				flanking_units.append(enemy_unit)
+		if is_living_enemy_unit(enemy) and not flanking_units.has(enemy):
+			flanking_units.append(enemy)
+	else:
+		return false
+	for first_index in range(flanking_units.size()):
+		for second_index in range(first_index + 1, flanking_units.size()):
+			if FlankingRulesScript.are_opposite_adjacent(
+				flanking_units[first_index].grid_position,
+				flanking_units[second_index].grid_position,
+				target_unit.grid_position
+			):
+				return true
+	return false
+
+func get_combat_advantage_attack_bonus(attacker: Node2D, target_unit: Node2D) -> int:
+	if not has_combat_advantage_condition(target_unit):
+		return 0
+	if is_enemy_unit(target_unit) and not is_living_player_ally(attacker):
+		return 0
+	if is_living_player_ally(target_unit) and not is_living_enemy_unit(attacker):
+		return 0
+	return FlankingRulesScript.COMBAT_ADVANTAGE_ATTACK_BONUS
+
+func get_flanking_attack_bonus(attacker: Node2D, target_unit: Node2D) -> int:
+	# Compatibilidade com chamadas anteriores; agora o bônus pertence à condição do alvo.
+	return get_combat_advantage_attack_bonus(attacker, target_unit)
 
 func get_hero_allies_near_enemy() -> Array:
 	var allies: Array = []
@@ -5541,6 +5855,7 @@ func create_spell_popup() -> void:
 	)
 	
 func open_spell_menu() -> void:
+	clear_pending_movement_preview()
 	if not is_instance_valid(hero):
 		print(
 			"Não é possível abrir magias: herói inválido."
@@ -7003,7 +7318,10 @@ func cast_control_spell(
 			attack_penalty,
 			armor_penalty,
 			movement_penalty,
-			effect_end_turn
+			effect_end_turn,
+			spell_name,
+			str(save_result.get("save_type", "will")),
+			int(save_result.get("save_dc", 0))
 		)
 	else:
 		print(
@@ -7388,6 +7706,8 @@ func handle_player_grid_click(
 	
 	if current_active_unit.hp <= 0:
 		return
+	if is_movement_animating or opportunity_warning_open:
+		return
 	
 	var clicked_unit: Node2D = (
 		get_unit_at_grid_position(
@@ -7400,6 +7720,7 @@ func handle_player_grid_click(
 	# Deve ser processado antes de ataque, seleção e movimento.
 	# =====================================================
 	if waiting_spell_target:
+		clear_pending_movement_preview()
 		if pending_spell_data.is_empty():
 			cancel_pending_spell()
 			return
@@ -7473,6 +7794,7 @@ func handle_player_grid_click(
 	# SELEÇÃO, ATAQUE NORMAL E MOVIMENTO
 	# =====================================================
 	if is_instance_valid(clicked_unit):
+		clear_pending_movement_preview()
 		if clicked_unit == hero:
 			select_player_unit(hero)
 			return
@@ -7519,9 +7841,12 @@ func handle_player_grid_click(
 		clear_player_unit_selection_for_camera()
 		return
 	
-	await move_selected_player_unit(
-		clicked_grid_position
-	)
+	var acting_unit: Node2D = get_acting_unit()
+	if pending_movement_unit == acting_unit and pending_movement_destination == clicked_grid_position:
+		clear_pending_movement_preview()
+		await move_selected_player_unit(clicked_grid_position)
+	else:
+		show_pending_movement_preview(acting_unit, clicked_grid_position)
 
 func move_animal_companion(
 	new_grid_position: Vector2i
@@ -9001,6 +9326,20 @@ func update_active_effects_panel() -> void:
 	):
 		safe_hero = hero
 	
+	var combat_advantage_targets: Array[String] = []
+	for enemy_unit in enemies:
+		if is_instance_valid(enemy_unit) and has_combat_advantage_condition(enemy_unit):
+			combat_advantage_targets.append(get_unit_display_name(enemy_unit))
+	if is_instance_valid(safe_current_enemy) and not enemies.has(safe_current_enemy):
+		if has_combat_advantage_condition(safe_current_enemy):
+			combat_advantage_targets.append(get_unit_display_name(safe_current_enemy))
+	if is_instance_valid(safe_hero) and has_combat_advantage_condition(safe_hero):
+		combat_advantage_targets.append(get_unit_display_name(safe_hero))
+	if is_instance_valid(animal_companion) and has_combat_advantage_condition(animal_companion):
+		combat_advantage_targets.append(get_unit_display_name(animal_companion))
+	for npc_unit in npcs:
+		if is_living_player_ally(npc_unit) and has_combat_advantage_condition(npc_unit):
+			combat_advantage_targets.append(get_unit_display_name(npc_unit))
 	controller.update_display(
 		active_spell_areas,
 		enemies,
@@ -9008,7 +9347,8 @@ func update_active_effects_panel() -> void:
 		safe_hero,
 		battle_turn_count,
 		npcs,
-		maxi(0, bard_song_end_round - battle_turn_count + 1)
+		maxi(0, bard_song_end_round - battle_turn_count + 1),
+		combat_advantage_targets
 	)
 
 func get_enemy_target_unit() -> Node2D:
@@ -9495,7 +9835,26 @@ func start_enemy_initiative_turn(
 	)
 	
 	await enemy_turn()
+	resolve_enemy_control_at_turn_end(enemy_unit)
 	advance_initiative_turn()
+
+func resolve_enemy_control_at_turn_end(enemy_unit: Node2D) -> void:
+	if not is_instance_valid(enemy_unit) or enemy_unit.hp <= 0:
+		return
+	if not enemy_unit.has_method("resolve_control_end_of_turn"):
+		return
+	if enemy_unit.control_save_dc <= 0:
+		return
+	var save_bonus: int = get_unit_spell_save_bonus(enemy_unit, enemy_unit.control_save_type)
+	var result: Dictionary = enemy_unit.resolve_control_end_of_turn(save_bonus)
+	if result.is_empty():
+		return
+	print("Resistência ao fim do turno: ", get_unit_display_name(enemy_unit), " | ", result.get("effect_name", "Controle"), " | d20 ", result.get("dice_roll", 0), " + ", save_bonus, " vs CD ", result.get("save_dc", 0))
+	if bool(result.get("resisted", false)):
+		show_floating_text_on_unit(enemy_unit, "ACORDOU" if str(result.get("effect_name", "")) == "Sono" else "RESISTIU", 22, "miss")
+	else:
+		show_floating_text_on_unit(enemy_unit, "DORMINDO" if str(result.get("effect_name", "")) == "Sono" else "CONTROLADO", 22, "miss")
+	update_active_effects_panel()
 
 func start_current_initiative_turn():
 	if not initiative_started:
@@ -9741,6 +10100,8 @@ func create_scenario_start_panel() -> void:
 	)
 	if current_stage == 1 and stage_one_tutorial_enabled and not stage_one_tutorial_skipped and not stage_one_tutorial_shown:
 		show_stage_one_initiative_tutorial()
+	elif current_stage == 2:
+		show_stage_two_tactical_tutorial()
 
 func on_roll_initiative_pressed() -> void:
 	if initiative_started:
@@ -10008,6 +10369,7 @@ func animate_unit_movement(unit: Node2D, path: Array[Vector2i]):
 		tween.tween_property(unit, "position", target_position, movement_step_duration)
 		
 		await tween.finished
+		update_active_effects_panel()
 		if is_instance_valid(unit) and get_unit_class_name(unit) == "Ladino":
 			check_hidden_rogue_perception(unit)
 		elif is_instance_valid(unit) and is_enemy_unit(unit):
@@ -10216,7 +10578,8 @@ func create_movement_tile(
 	)
 	
 func show_path_preview(
-	path: Array[Vector2i]
+	path: Array[Vector2i],
+	opportunity_risk: bool = false
 ) -> void:
 	var overlay: Node = (
 		get_tactical_board_overlay()
@@ -10225,7 +10588,7 @@ func show_path_preview(
 	if not is_instance_valid(overlay):
 		return
 	
-	overlay.show_path_preview(path)
+	overlay.show_path_preview(path, opportunity_risk)
 
 func is_grid_position_blocked_for_path(
 	grid_position: Vector2i,
@@ -10524,17 +10887,13 @@ func award_enemy_rewards(
 	battle_gold_gained += gained_gold
 	battle_enemies_defeated += 1
 
-	# O herói usa seu próprio sistema de progressão.
+	# Ouro é recebido agora; XP fica pendente até a vitória.
 	if is_instance_valid(hero):
-		grant_hero_xp(
-			gained_xp
-		)
-
 		hero.gold += gained_gold
 		GameState.hero_gold = hero.gold
 
-	# Integrantes ativos e aliados jogáveis presentes no combate
-	# recebem XP uma única vez, mesmo se estiverem na reserva.
+	# Registra quem estava apto a receber esta recompensa, inclusive
+	# aliados que entraram no combate depois de outros inimigos caírem.
 	var playable_npc_ids: Array[String] = []
 	for npc_unit in npcs:
 		if not is_instance_valid(npc_unit):
@@ -10544,13 +10903,20 @@ func award_enemy_rewards(
 		var playable_id: String = str(npc_unit.npc_id)
 		if PartyManager.has_member(playable_id) and not playable_npc_ids.has(playable_id):
 			playable_npc_ids.append(playable_id)
-	var rewarded_member_ids: Array[String] = (
-		PartyManager.grant_xp_to_active_members(
-			gained_xp,
-			"hero",
-			playable_npc_ids
-		)
-	)
+	var pending_member_ids: Array[String] = []
+	for active_member_id in PartyManager.active_party:
+		if not pending_member_ids.has(active_member_id):
+			pending_member_ids.append(active_member_id)
+	for playable_id in playable_npc_ids:
+		if not pending_member_ids.has(playable_id):
+			pending_member_ids.append(playable_id)
+	for member_id in pending_member_ids:
+		if member_id == PartyManager.HERO_MEMBER_ID or not PartyManager.has_member(member_id):
+			continue
+		var member_data: Dictionary = PartyManager.get_member(member_id)
+		if not bool(member_data.get("available", true)):
+			continue
+		battle_pending_member_xp[member_id] = int(battle_pending_member_xp.get(member_id, 0)) + gained_xp
 
 	print("====================================")
 	print("RECOMPENSA RECEBIDA")
@@ -10589,8 +10955,8 @@ func award_enemy_rewards(
 
 	if is_instance_valid(hero):
 		print(
-			"XP total do herói: ",
-			hero.total_xp
+			"XP pendente do herói: ",
+			battle_xp_gained
 		)
 
 		print(
@@ -10603,22 +10969,15 @@ func award_enemy_rewards(
 			hero.level
 		)
 
-	if not rewarded_member_ids.is_empty():
+	if not battle_pending_member_xp.is_empty():
 		print(
-			"Outros integrantes que receberam XP: ",
-			rewarded_member_ids
+			"XP pendente dos integrantes: ",
+			battle_pending_member_xp
 		)
 
 	print("====================================")
 
 	if is_instance_valid(hero):
-		show_floating_text_on_unit(
-			hero,
-			"+" + str(gained_xp) + " XP",
-			22,
-			"utility"
-		)
-
 		if gained_gold > 0:
 			await get_tree().create_timer(
 				0.25
@@ -10631,43 +10990,6 @@ func award_enemy_rewards(
 				"utility"
 			)
 
-	# Atualiza imediatamente cada NPC integrante ativo.
-	for npc_unit in npcs:
-		if not is_instance_valid(npc_unit):
-			continue
-
-		var npc_member_id: String = ""
-
-		if "npc_id" in npc_unit:
-			npc_member_id = str(
-				npc_unit.npc_id
-			)
-
-		if not rewarded_member_ids.has(
-			npc_member_id
-		):
-			continue
-
-		var member_data: Dictionary = (
-			PartyManager.get_member(
-				npc_member_id
-			)
-		)
-
-		if npc_unit.has_method(
-			"apply_party_member_progression"
-		):
-			npc_unit.apply_party_member_progression(
-				member_data
-			)
-
-		show_floating_text_on_unit(
-			npc_unit,
-			"+" + str(gained_xp) + " XP",
-			22,
-			"utility"
-		)
-
 	update_movement_label()
 	update_active_effects_panel()
 
@@ -10675,6 +10997,25 @@ func award_enemy_rewards(
 		"update_character_sheet_panel"
 	):
 		update_character_sheet_panel()
+
+
+func commit_battle_experience() -> void:
+	if battle_xp_gained <= 0:
+		return
+	if is_instance_valid(hero):
+		grant_hero_xp(battle_xp_gained)
+	for member_id in battle_pending_member_xp:
+		var amount: int = int(battle_pending_member_xp[member_id])
+		var selected_ids: Array[String] = [str(member_id)]
+		PartyManager.grant_xp_to_selected_members(amount, selected_ids, PartyManager.HERO_MEMBER_ID)
+		for npc_unit in npcs:
+			if not is_instance_valid(npc_unit) or not ("npc_id" in npc_unit):
+				continue
+			if str(npc_unit.npc_id) == str(member_id) and npc_unit.has_method("apply_party_member_progression"):
+				npc_unit.apply_party_member_progression(PartyManager.get_member(str(member_id)))
+	battle_pending_member_xp.clear()
+	update_movement_label()
+	update_active_effects_panel()
 
 func process_defeated_enemy_rewards():
 	for enemy_unit in enemies:
@@ -10975,6 +11316,8 @@ func enemy_attack_target(
 		return
 	
 	if not is_instance_valid(target_unit):
+		return
+	if target_unit.hp <= 0 or not target_unit.visible:
 		return
 	
 	if enemy.has_attacked:
@@ -11299,6 +11642,41 @@ func create_battle_zoom_controls() -> void:
 	zoom_out_button.add_theme_font_size_override("font_size", 32)
 	zoom_out_button.pressed.connect(change_battle_zoom.bind(-0.15))
 	zoom_controls.add_child(zoom_out_button)
+
+func create_enemy_intent_toggle_button() -> void:
+	if not is_instance_valid(ui_layer):
+		return
+	enemy_intent_button = Button.new()
+	enemy_intent_button.name = "EnemyIntentButton"
+	enemy_intent_button.toggle_mode = true
+	enemy_intent_button.button_pressed = enemy_intents_enabled
+	enemy_intent_button.text = "Alvos ✓" if enemy_intents_enabled else "Alvos ✕"
+	enemy_intent_button.tooltip_text = "Setas: alvo provável da IA. Vermelho = no alcance da arma; dourado = aproximando-se. Toque para ocultar."
+	enemy_intent_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	enemy_intent_button.offset_left = -142
+	enemy_intent_button.offset_right = -14
+	enemy_intent_button.offset_top = 76
+	enemy_intent_button.offset_bottom = 126
+	enemy_intent_button.add_theme_font_size_override("font_size", 18)
+	var normal_style := StyleBoxFlat.new()
+	normal_style.bg_color = Color(0.035, 0.05, 0.06, 0.94)
+	normal_style.border_color = Color(0.73, 0.56, 0.24)
+	normal_style.set_border_width_all(2)
+	normal_style.set_corner_radius_all(8)
+	enemy_intent_button.add_theme_stylebox_override("normal", normal_style)
+	var pressed_style: StyleBoxFlat = normal_style.duplicate() as StyleBoxFlat
+	pressed_style.bg_color = Color(0.12, 0.28, 0.22, 0.96)
+	pressed_style.border_color = Color(0.46, 0.90, 0.68)
+	enemy_intent_button.add_theme_stylebox_override("pressed", pressed_style)
+	enemy_intent_button.toggled.connect(set_enemy_intents_enabled)
+	ui_layer.add_child(enemy_intent_button)
+
+func set_enemy_intents_enabled(enabled: bool) -> void:
+	enemy_intents_enabled = enabled
+	if is_instance_valid(enemy_intent_button):
+		enemy_intent_button.text = "Alvos ✓" if enabled else "Alvos ✕"
+	enemy_intent_refresh_timer = 0.0
+	refresh_enemy_intent_overlay()
 
 func change_battle_zoom(amount: float) -> void:
 	if not is_instance_valid(game_camera):
@@ -11975,6 +12353,12 @@ func spawn_npc(
 			npc_instance.apply_party_member_progression(
 				party_member_data
 			)
+		npc_instance.max_hp = maxi(1, int(party_member_data.get("max_hp", npc_instance.max_hp)))
+		npc_instance.hp = clampi(int(party_member_data.get("current_hp", npc_instance.max_hp)), 0, npc_instance.max_hp)
+		npc_instance.daily_powers_used = party_member_data.get("daily_powers_used", []).duplicate()
+		if npc_instance.hp <= 0:
+			npc_instance.visible = false
+		npc_instance.update_health_bar()
 
 	if npc_instance.has_method(
 		"update_world_position"
@@ -13217,7 +13601,7 @@ func begin_player_controlled_turn(unit: Node2D):
 				else:
 					show_stage_one_guided_step(
 						"approach", "Aproxime-se para atacar",
-						"Toque em uma casa azul para chegar ao alcance de um inimigo. Se não houver movimento suficiente neste turno, termine-o e tente novamente quando seu herói agir.",
+						"Toque em uma casa azul para ver o caminho e toque novamente para se aproximar do inimigo. Se não houver movimento suficiente neste turno, termine-o e tente novamente quando seu herói agir.",
 						"movement_area"
 					)
 			elif stage_one_tutorial_phase in ["magic_wait", "magic_menu"]:
@@ -13573,12 +13957,17 @@ func roll_attack_result(
 		):
 			UIAudioManager.play_dice_roll()
 	
+	var advantage_bonus: int = get_combat_advantage_attack_bonus(attacker_unit, target_unit)
+	var total_attack_bonus: int = attack_bonus + advantage_bonus
+	if advantage_bonus > 0:
+		show_floating_text_on_unit(attacker_unit, "VANTAGEM DE COMBATE +%d" % advantage_bonus, 18, "utility")
 	var attack_result: Dictionary = (
 		CombatAttackResolverScript.resolve_attack(
-			attack_bonus,
+			total_attack_bonus,
 			target_ac
 		)
 	)
+	attack_result["combat_advantage_bonus"] = advantage_bonus
 	
 	var dice_roll: int = int(
 		attack_result.get(
@@ -13590,7 +13979,7 @@ func roll_attack_result(
 	var attack_total: int = int(
 		attack_result.get(
 			"attack_total",
-			dice_roll + attack_bonus
+			dice_roll + total_attack_bonus
 		)
 	)
 	
@@ -13640,7 +14029,7 @@ func roll_attack_result(
 		attack_roll_box.call(
 			"show_roll",
 			dice_roll,
-			attack_bonus,
+			total_attack_bonus,
 			attack_total,
 			target_ac,
 			hit,
@@ -13783,6 +14172,8 @@ func apply_damage_to_unit(
 	flash_duration: float = 0.20
 ) -> int:
 	if not is_instance_valid(unit):
+		return 0
+	if unit.hp <= 0 or not unit.visible:
 		return 0
 	
 	var safe_damage: int = max(
@@ -14329,7 +14720,8 @@ func configure_hero_from_game_state() -> void:
 			hero.max_movement_meters
 		)
 	
-	hero.hp = hero.max_hp
+	var saved_hero_data: Dictionary = PartyManager.get_member(PartyManager.HERO_MEMBER_ID)
+	hero.hp = clampi(int(saved_hero_data.get("current_hp", hero.max_hp)), 0, hero.max_hp)
 	hero.current_movement_meters = (
 		hero.max_movement_meters
 	)
@@ -15070,6 +15462,8 @@ func create_story_dialog_popup():
 func set_gameplay_panels_visible(
 	should_be_visible: bool
 ) -> void:
+	if not should_be_visible:
+		clear_pending_movement_preview()
 	if is_instance_valid(
 		combat_character_sheet_controller
 	):
@@ -16765,19 +17159,21 @@ func play_scenario_victory_sequence() -> bool:
 		var stage_one_guard: Node2D = find_scenario_npc_by_id("Guarda Aliado")
 		if is_instance_valid(stage_one_guard) and stage_one_guard.hp > 0:
 			guard_unit = stage_one_guard
-			var bonus_gold: int = int(sequence_data.get("guard_survival_bonus_gold", 0))
-			if bonus_gold > 0 and is_instance_valid(hero):
-				hero.gold += bonus_gold
-				GameState.hero_gold = hero.gold
-				battle_gold_gained += bonus_gold
-			var guard_dialogues: Array = sequence_data.get("guard_survival_dialogues", [])
-			var victory_dialogues: Array = sequence_data.get("dialogues", [])
-			sequence_data["dialogues"] = guard_dialogues + victory_dialogues
+		sequence_data["dialogues"] = ScenarioDatabase.assemble_stage_1_victory_dialogues(
+			sequence_data,
+			is_instance_valid(guard_unit)
+		)
 
 	await show_scenario_victory_dialogues(
 		sequence_data,
 		uiliam_unit
 	)
+	if current_stage == 1 and is_instance_valid(guard_unit):
+		var bonus_gold: int = int(sequence_data.get("guard_survival_bonus_gold", 0))
+		if bonus_gold > 0 and is_instance_valid(hero):
+			hero.gold += bonus_gold
+			GameState.hero_gold = hero.gold
+			battle_gold_gained += bonus_gold
 
 	await animate_victory_units_to_village(
 		sequence_data,
@@ -16814,14 +17210,7 @@ func play_scenario_victory_sequence() -> bool:
 			1.0
 		)
 
-	await fade_out_scenario_transition(
-		1.0
-	)
-
-	get_tree().change_scene_to_file(
-		next_scene_path
-	)
-
+	SceneTransition.change_scene_to_file(next_scene_path, 1.0)
 	return true
 
 func restore_saved_inventory_and_party_state() -> void:
@@ -16928,35 +17317,15 @@ func get_hero_spellcasting_modifier() -> int:
 		"Clérigo", "Druida", "Paladino", "Ranger":
 			return hero.get_wisdom_modifier()
 		
-		"Bardo", "Feiticeiro":
+		"Bardo", "Feiticeiro", "Bruxo":
 			return hero.get_charisma_modifier()
 		
 		_:
 			return 0
 func get_spell_save_dc(
-	spell_data: Dictionary
+	_spell_data: Dictionary
 ) -> int:
-	if spell_data.has("save_dc"):
-		return int(
-			spell_data.get(
-				"save_dc",
-				12
-			)
-		) + (1 if is_instance_valid(hero) and hero.character_race == "Elfo" else 0) + (int(hero.feat_spell_save_dc_bonus) if is_instance_valid(hero) else 0)
-	
-	var spell_level: int = int(
-		spell_data.get(
-			"level",
-			0
-		)
-	)
-	
-	return max(
-		1,
-		10
-		+ spell_level
-		+ get_hero_spellcasting_modifier()
-	) + (1 if is_instance_valid(hero) and hero.character_race == "Elfo" else 0) + (int(hero.feat_spell_save_dc_bonus) if is_instance_valid(hero) else 0)
+	return 10 + get_hero_spellcasting_modifier() + (1 if is_instance_valid(hero) and hero.character_race == "Elfo" else 0) + (int(hero.feat_spell_save_dc_bonus) if is_instance_valid(hero) else 0)
 func get_unit_spell_save_bonus(
 	target_unit: Node2D,
 	save_type: String
@@ -17154,11 +17523,26 @@ func show_spell_resolution_box(
 	)
 func on_animal_companion_defeated() -> void:
 	print(
-		"Removendo companheiro derrotado "
-		+ "da ordem de iniciativa."
+		"Companheiro derrotado permanece no mapa, "
+		+ "fora da ordem de iniciativa."
 	)
 	
-	remove_animal_companion()
+	if not is_instance_valid(animal_companion):
+		return
+	for index in range(initiative_order.size() - 1, -1, -1):
+		if initiative_order[index] != animal_companion:
+			continue
+		initiative_order.remove_at(index)
+		if index < current_initiative_index:
+			current_initiative_index -= 1
+	if current_initiative_index < 0:
+		current_initiative_index = 0
+	if current_active_unit == animal_companion:
+		current_active_unit = null
+	if selected_player_unit == animal_companion:
+		selected_player_unit = hero if is_instance_valid(hero) and hero.hp > 0 else null
+	refresh_action_ui()
+	refresh_selected_unit_ui()
 
 func is_animal_companion_unit(
 	unit: Node2D
@@ -17863,6 +18247,8 @@ func play_stage_2_victory_sequence() -> bool:
 		"aniri_judgment",
 		selected_choice_id
 	)
+	if MissionManager.is_mission_active("jhon_basement"):
+		MissionManager.complete_mission("jhon_basement")
 
 	var conclusion_data: Dictionary = (
 		ScenarioDatabase
@@ -17998,14 +18384,7 @@ func play_stage_2_victory_sequence() -> bool:
 			1.0
 		)
 
-	await fade_out_scenario_transition(
-		1.0
-	)
-
-	get_tree().change_scene_to_file(
-		next_scene_path
-	)
-
+	SceneTransition.change_scene_to_file(next_scene_path, 1.0)
 	return true
 func find_free_scenario_arrival_cell(
 	preferred_position: Vector2i,

@@ -105,6 +105,26 @@ func update_mission_progress(
 	return true
 
 
+func update_mission_description(mission_id: String, description: String) -> bool:
+	if not active_missions.has(mission_id):
+		return false
+	var mission_data: Dictionary = active_missions[mission_id].duplicate(true)
+	mission_data["description"] = description
+	active_missions[mission_id] = mission_data
+	mission_updated.emit(mission_data.duplicate(true))
+	return true
+
+
+func update_mission_title(mission_id: String, title: String) -> bool:
+	if not active_missions.has(mission_id):
+		return false
+	var mission_data: Dictionary = active_missions[mission_id].duplicate(true)
+	mission_data["title"] = title
+	active_missions[mission_id] = mission_data
+	mission_updated.emit(mission_data.duplicate(true))
+	return true
+
+
 func complete_mission(
 	mission_id: String
 ) -> bool:

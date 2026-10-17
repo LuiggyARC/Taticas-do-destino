@@ -1856,11 +1856,11 @@ func confirm_character():
 			GameState.hero_animal_companion_type
 		)
 	
-	get_tree().change_scene_to_file("res://Scene/main.tscn")
+	SceneTransition.change_scene_to_file("res://Scene/main.tscn")
 	
 func back_to_menu():
 	UIAudioManager.play_back()
-	get_tree().change_scene_to_file("res://Scene/main_menu.tscn")
+	SceneTransition.change_scene_to_file("res://Scene/main_menu.tscn")
 	
 func on_class_selected(index: int):
 	UIAudioManager.play_select()

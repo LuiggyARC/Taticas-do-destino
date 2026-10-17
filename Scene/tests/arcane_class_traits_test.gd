@@ -38,7 +38,7 @@ func _ready() -> void:
 	assert(hero.feat_extra_spell_slot_level_1 == 1)
 	var combat: Node2D = MainScript.new()
 	combat.hero = hero
-	assert(combat.get_spell_save_dc({"level": 1}) == 11 + hero.get_intelligence_modifier() + 1)
+	assert(combat.get_spell_save_dc({"level": 1, "save_dc": 25}) == 10 + hero.get_intelligence_modifier() + 1)
 	combat.free()
 	hero.free()
 
@@ -53,6 +53,25 @@ func _ready() -> void:
 	var level_manager := LevelUpManager.new()
 	assert(int(level_manager.get_spell_slot_limits("Mago", 1).get(1, 0)) == 3)
 	assert(int(level_manager.get_spell_slot_limits("Feiticeiro", 1).get(1, 0)) == 2)
+	var wizard_spells: Array = SpellDatabase.get_spells_for_class("Mago")
+	var sorcerer_spells: Array = SpellDatabase.get_spells_for_class("Feiticeiro")
+	var bard_spells: Array = SpellDatabase.get_spells_for_class("Bardo")
+	assert(SpellDatabase.get_spell_data("Som Fantasma").is_empty())
+	assert(wizard_spells.has("Selo de Lentidão") and wizard_spells.has("Prisão Arcana"))
+	assert(not sorcerer_spells.has("Selo de Lentidão"))
+	assert(sorcerer_spells.has("Pulso Sonoro") and sorcerer_spells.has("Explosão de Brasas"))
+	assert(not wizard_spells.has("Pulso Sonoro") and not wizard_spells.has("Explosão de Brasas"))
+	assert(bard_spells.has("Pulso Sonoro"))
+	var old_wizard: Node2D = HeroScript.new()
+	old_wizard.character_class = "Mago"
+	old_wizard.setup_class_spells(["Som Fantasma"])
+	assert(old_wizard.known_spells.has("Selo de Lentidão"))
+	old_wizard.free()
+	var old_sorcerer: Node2D = HeroScript.new()
+	old_sorcerer.character_class = "Feiticeiro"
+	old_sorcerer.setup_class_spells(["Som Fantasma"])
+	assert(old_sorcerer.known_spells.has("Pulso Sonoro"))
+	old_sorcerer.free()
 
 	GameState.player_class = "Mago"
 	GameState.hero_level = 3

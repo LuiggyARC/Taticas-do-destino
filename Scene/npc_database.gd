@@ -45,7 +45,7 @@ static func get_guard_ally() -> Dictionary:
 		"control_type": "ai",
 		
 		"max_hp": 16,
-		"hp": 2,
+		"hp": 5,
 		
 		"armor_class": 10,
 		"touch_armor_class": 11,

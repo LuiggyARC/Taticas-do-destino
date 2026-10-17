@@ -7,298 +7,174 @@ const EmeraldBridgeMayorDatabase := preload("res://Scene/emerald_bridge_mayor_da
 
 const CARPENTER_BASEMENT_SCRIPTS := {
 	"carpenter_basement_request": """
-Ação|O aventureiro e Uiliam entram na carpintaria. Há madeira empilhada, móveis incompletos e bancadas praticamente vazias. Jhon está próximo a uma mesa, claramente irritado.
-Jhon|Olá.
-Jhon|Se vieram encomendar alguma coisa, chegaram em uma péssima hora.
-Aventureiro|Por quê?
-Jhon|Porque minhas ferramentas sumiram.
-Ação|O aventureiro olha para as bancadas vazias.
-Jhon|Martelos.
-Jhon|Formões.
-Jhon|Algumas ferramentas pequenas.
-Jhon|Até uma bolsa com moedas desapareceu.
-Aventureiro|Tudo de uma vez?
-Jhon|Praticamente.
-Sir Uiliam|Alguém entrou aqui?
-Jhon|Se entrou, não vi.
-Jhon|Mas tenho outro problema.
-Ação|Jhon aponta para uma porta que leva ao porão.
-Jhon|Ratos.
-Aventureiro|Ratos?
-Jhon|Muitos.
-Jhon|Começaram a aparecer no porão e agora não consigo nem descer lá.
-Aventureiro|E você acha que os ratos roubaram seus martelos?
-Ação|Jhon olha para o aventureiro.
+Ação|O aventureiro e Uiliam entram na carpintaria. Há móveis incompletos e bancadas praticamente vazias.
+Jhon|Se vieram encomendar alguma coisa, chegaram numa péssima hora.
+Aventureiro|O que aconteceu?
+Jhon|Minhas ferramentas desapareceram.
+Jhon|Martelos, formões, moedas... levaram um pouco de tudo.
+Sir Uiliam|Viu alguém entrar?
 Jhon|Não.
-Jhon|Se começarem a usar ferramentas, aí eu abandono a carpintaria.
-Aventureiro|Só queria confirmar.
-Ação|Jhon observa os dois com mais atenção.
+Ação|Jhon aponta para a porta do porão.
+Jhon|E ainda tenho ratos lá embaixo.
+Aventureiro|Os ratos levaram as ferramentas?
+Ação|Jhon encara o aventureiro.
+Jhon|Espero que não.
+Jhon|Se começarem a usar martelos, abandono esta vila.
+Aventureiro|Justo.
+Ação|Jhon observa os dois.
 Jhon|Vocês não são daqui.
-Sir Uiliam|Não.
 Ação|Uiliam assume sua postura habitual.
 Sir Uiliam|Sou Uiliam, paladino a serviço da Ordem de Vanir. Consagrei minha espada à preservação da ordem, à defesa dos inocentes e ao triunfo da justiça.
-Ação|Jhon fica alguns segundos olhando para ele.
+Jhon|...
 Jhon|Certo.
-Ação|O aventureiro olha para Uiliam.
-Aventureiro|Você realmente faz isso toda vez.
+Aventureiro|Ele realmente faz isso sempre.
 Sir Uiliam|Eu disse que fazia.
-Jhon|E ele?
-Ação|Jhon aponta para o aventureiro.
-Sir Uiliam|Este é—
+Jhon|E você?
 Aventureiro|[PLAYER_NAME].
-Ação|Uiliam para.
-Aventureiro|Essa parte eu consigo responder sozinho.
 Jhon|De onde veio?
-Aventureiro|Essa parte já é mais complicada.
-Jhon|Como assim?
-Aventureiro|Ainda estamos tentando descobrir.
+Aventureiro|Ainda estou tentando descobrir.
 Ação|Jhon olha para Uiliam.
-Jhon|Ele bateu a cabeça?
-Aventureiro|Todo mundo pergunta isso?
-Sir Uiliam|Quando começaram os problemas com os ratos?
-Jhon|Pouco antes das ferramentas desaparecerem.
-Aventureiro|Isso parece importante.
-Jhon|Também achei.
-Jhon|Mas toda vez que tento descer...
-Ação|Um barulho vem do porão. Algo cai lá embaixo.
-Jhon|...acontece isso.
-Aventureiro|Ratos fazem esse tipo de barulho?
-Jhon|Esses fazem.
-Ação|Outro ruído vem do porão.
-Aventureiro|Tem certeza de que só existem ratos lá embaixo?
-Jhon|Não.
-Aventureiro|Isso também parece importante.
-Jhon|É por isso que ainda estou aqui em cima.
-Sir Uiliam|Podemos verificar seu porão.
-Ação|O aventureiro imediatamente olha para Uiliam.
-Aventureiro|“Podemos”?
-Ação|Uiliam percebe.
-Sir Uiliam|...
-Sir Uiliam|Eu posso verificar seu porão.
+Jhon|Bateu a cabeça?
+Aventureiro|Parece que essa pergunta vai me acompanhar por algum tempo.
+Sir Uiliam|Quando os ratos apareceram?
+Jhon|Pouco antes das ferramentas sumirem.
+Aventureiro|Pode ter relação.
+Jhon|Também pensei nisso.
+Ação|Um forte barulho vem do porão. Os três olham para a porta.
+Aventureiro|São ratos?
+Jhon|Até onde sei.
+Aventureiro|Isso não pareceu muito convincente.
+Jhon|É por isso que continuo aqui em cima.
+Ação|Uiliam se aproxima da porta.
+Sir Uiliam|Eu posso verificar.
 Ação|Ele olha para o aventureiro.
-Sir Uiliam|Se quiser me acompanhar.
-Aventureiro|Melhor.
-Jhon|Vocês dois discutem isso com frequência?
-Aventureiro|Nós nos conhecemos há algumas horas.
-Jhon|Então ainda vai piorar.
-Sir Uiliam|Jhon.
-Jhon|Só estou avisando.
+Sir Uiliam|Se quiser acompanhar.
 """,
 	"carpenter_basement_accept": """
 Aventureiro|Vamos ajudar.
-Sir Uiliam|Tem certeza?
-Aventureiro|Além disso...
 Ação|O aventureiro olha para a própria arma.
-Aventureiro|aparentemente lutar é uma das poucas coisas que sei fazer.
-Sir Uiliam|Uma razão aceitável.
-Jhon|Para mim também.
+Aventureiro|Lutar parece ser uma das poucas coisas que sei fazer.
+Sir Uiliam|Então espero que os ratos saibam disso.
+Jhon|Eu também.
 """,
 	"carpenter_basement_question": """
-Aventureiro|Por que exatamente isso virou problema nosso?
-Sir Uiliam|Não virou.
-Aventureiro|Você acabou de oferecer nossa ajuda.
-Sir Uiliam|Ofereci a minha.
-Ação|Uma pequena pausa.
-Sir Uiliam|Estamos aqui.
-Sir Uiliam|Somos capazes de ajudar.
-Sir Uiliam|Mas a decisão de descer comigo é sua.
-Ação|O aventureiro observa Uiliam por alguns segundos.
-Aventureiro|Você realmente levou aquela conversa da taverna a sério.
-Sir Uiliam|Eu costumo levar minhas palavras a sério.
-Aventureiro|Certo.
+Aventureiro|Primeiro quero saber com o que estamos lidando.
+Jhon|Ratos.
+Aventureiro|Você acabou de dizer “até onde sei”.
+Jhon|Ratos grandes?
+Aventureiro|Melhorou muito.
+Sir Uiliam|Podemos descobrir descendo.
 Ação|O aventureiro olha para a porta do porão.
-Aventureiro|Então eu escolho ir.
-Sir Uiliam|Muito bem.
-Aventureiro|Mas se esses ratos começarem a usar martelos...
-Aventureiro|eu vou embora.
-Jhon|Justo.
+Aventureiro|Certo.
+Aventureiro|Eu vou.
 """,
 	"carpenter_basement_warning": """
-Ação|Jhon abre a porta que leva ao porão. Uma escada desce para a escuridão.
-Jhon|O porão fica aí embaixo.
-Jhon|Matem os ratos e, se encontrarem minhas ferramentas, tragam tudo de volta.
-Aventureiro|Mais alguma coisa que deveríamos saber?
+Ação|Jhon abre a porta do porão. Uma escada desce para a escuridão.
+Jhon|Matem os ratos.
+Jhon|E, se encontrarem minhas ferramentas, tragam tudo de volta.
+Aventureiro|Mais alguma coisa?
 Jhon|Sim.
 Jhon|Se vocês não voltarem...
 Ação|Uma pequena pausa.
-Jhon|não vou descer para retirar os corpos.
-Ação|Silêncio.
-Aventureiro|Você é muito bom em incentivar pessoas.
-Jhon|Sou carpinteiro.
-Jhon|Não trabalho com motivação.
+Jhon|não vou descer para buscar os corpos.
+Aventureiro|Reconfortante.
+Jhon|Sou carpinteiro, não motivador.
 Sir Uiliam|Vamos.
 Ação|Uiliam começa a descer.
+Ação|O aventureiro olha para a escuridão.
+Aventureiro|Monstros na estrada.
+Aventureiro|Ratos no porão.
+Sir Uiliam|Está conhecendo Aviant rapidamente.
+Aventureiro|Isso começa a me preocupar.
+Ação|Ele desce.
+Novo objetivo|O Porão de Jhon: elimine os ratos e encontre as ferramentas desaparecidas.
 """
 }
 
 const TAVERN_HISTORY_BEFORE_VIDEO := """
-Ação|O aventureiro entra na taverna acompanhado por Uiliam. O lugar está tranquilo; Uiliam escolhe uma mesa afastada e se senta.
-Aventureiro|Então?
-Ação|Uiliam observa o aventureiro por alguns segundos. Seu semblante fica mais sério.
-Sir Uiliam|Sente-se.
-Sir Uiliam|Vou lhe contar uma história, [PLAYER_NAME].
-Aventureiro|Isso vai responder minhas perguntas?
-Sir Uiliam|Vai criar algumas novas.
-Aventureiro|Ótimo.
-Sir Uiliam|Mas sem ela, nenhuma das respostas fará sentido.
-Ação|O aventureiro se senta.
-Sir Uiliam|Para compreender o estado deste mundo...
-Sir Uiliam|primeiro você precisa entender como chegamos até aqui.
+Ação|O aventureiro entra na taverna acompanhado por Uiliam. Os dois se sentam em uma mesa afastada.
+Aventureiro|Então...
+Aventureiro|você disse que explicaria onde estou.
+Sir Uiliam|E explicarei.
+Sir Uiliam|Mas primeiro precisa entender o que aconteceu com este mundo.
+Aventureiro|Parece simples.
+Sir Uiliam|Não é.
 """
 
 const TAVERN_HISTORY_AFTER_VIDEO := """
-Ação|A imagem retorna lentamente. O aventureiro permanece alguns segundos em silêncio.
-Aventureiro|Então...
-Ação|Ele tenta organizar tudo que acabou de ouvir.
-Aventureiro|Sete reinos passaram séculos lutando entre si.
-Aventureiro|Aurora conseguiu unir todos eles.
-Aventureiro|Depois tentou garantir que tudo continuasse unido quando ela morresse...
-Aventureiro|e acabou abrindo uma passagem entre mundos.
-Sir Uiliam|Essencialmente.
-Aventureiro|Cinco guerreiros fecharam a Ruptura.
-Aventureiro|Mas as criaturas que já tinham atravessado ficaram.
-Sir Uiliam|Exatamente.
+Ação|A imagem retorna à taverna. O aventureiro permanece alguns segundos em silêncio.
+Aventureiro|Então aquelas criaturas vieram por causa da Ruptura.
+Sir Uiliam|Muitas delas, sim.
 Aventureiro|E os Selos protegem as cidades.
-Sir Uiliam|A maioria delas.
-Ação|O aventureiro olha para Uiliam.
-Aventureiro|Então acho que estou começando a entender.
-Sir Uiliam|O quê?
-Aventureiro|Por que aquele guarda estava cercado de monstros mesmo existindo essas tais barreiras.
-Sir Uiliam|Os Selos não protegem todos.
-Sir Uiliam|Protegem cidades grandes e alguns pontos considerados importantes.
-Sir Uiliam|Estradas, florestas e cavernas seguem nas mãos do mal...
-Sir Uiliam|grande parte de Aviant permanece fora de sua proteção.
-Aventureiro|Então sair de uma cidade é sempre daquele jeito?
-Sir Uiliam|Não.
-Sir Uiliam|Pelo menos não deveria ser.
-Aventureiro|Isso não pareceu muito reconfortante.
-Sir Uiliam|Não pretendia ser.
-Sir Uiliam|Os Selos mantiveram nossas cidades relativamente seguras durante gerações.
-Sir Uiliam|Mas nunca fizeram as criaturas desaparecerem.
-Sir Uiliam|Elas continuam lá fora.
-Sir Uiliam|Nas cavernas.
-Sir Uiliam|Nas florestas.
-Sir Uiliam|Nas ruínas deixadas desde a Grande Ruptura.
-Aventureiro|Há trezentos anos?
 Sir Uiliam|Sim.
-Aventureiro|E ninguém conseguiu acabar com elas nesse tempo todo?
-Sir Uiliam|Muitos tentaram.
-Sir Uiliam|Muitos ainda tentam.
-Sir Uiliam|Mas Aviant é grande.
-Sir Uiliam|E as criaturas nunca deixaram de aparecer.
-Ação|Uiliam faz uma pequena pausa.
-Sir Uiliam|O problema é que, ultimamente...
-Sir Uiliam|parecem existir cada vez mais delas.
-Aventureiro|Como as que encontramos hoje.
+Sir Uiliam|É graças a eles que nossas cidades permanecem protegidas.
+Aventureiro|Então como aquele guarda foi cercado?
+Sir Uiliam|Porque os Selos protegem as cidades.
+Sir Uiliam|Não as estradas, florestas ou regiões além delas.
+Aventureiro|Entendi.
+Aventureiro|Então sair dos muros é que é perigoso.
+Sir Uiliam|Pode ser.
+Ação|Uiliam fica mais sério.
+Sir Uiliam|E ultimamente está ficando mais perigoso.
+Aventureiro|Mais criaturas?
 Sir Uiliam|Sim.
-Aventureiro|Tão perto da vila.
-Sir Uiliam|Exatamente.
-Ação|O aventureiro começa a perceber a preocupação de Uiliam.
-Sir Uiliam|Antigamente, histórias sobre grandes guerreiros faziam jovens sonharem em se tornar aventureiros.
-Sir Uiliam|Homens e mulheres deixavam suas casas para enfrentar aquilo que existia além dos Selos.
-Aventureiro|E hoje não fazem mais isso?
-Sir Uiliam|Alguns fazem.
-Sir Uiliam|Cada vez menos.
-Aventureiro|Por quê?
-Sir Uiliam|Porque muitos não voltam.
-Pausa|0.6
-Sir Uiliam|Hoje, poucas pessoas desejam trocar a segurança dos muros por uma espada e uma estrada incerta.
-Sir Uiliam|E não posso culpá-las.
-Aventureiro|Mas isso incomoda você.
-Ação|Uiliam olha para o aventureiro.
-Sir Uiliam|Incomoda.
-Aventureiro|Por quê?
-Sir Uiliam|Porque as criaturas não se importam com nossos medos.
-Sir Uiliam|Enquanto o número delas cresce...
-Sir Uiliam|o número daqueles dispostos a enfrentá-las diminui.
-Sir Uiliam|É isso que preocupa a Ordem de Vanir.
-Sir Uiliam|Precisamos constantemente de novos guerreiros.
-Sir Uiliam|Pessoas dispostas a proteger estradas, investigar ataques e enfrentar aquilo que os Selos não conseguem deter.
-Aventureiro|“Precisamos”?
-Sir Uiliam|Sim.
-Aventureiro|Você está tentando me recrutar?
-Ação|Uiliam fica alguns segundos em silêncio.
+Aventureiro|Sabem por quê?
 Sir Uiliam|Ainda não.
-Aventureiro|Ainda?
-Sir Uiliam|Você apareceu sem conhecer Aviant e sem sequer saber como chegou aqui.
-Sir Uiliam|Seria irresponsável pedir que jurasse lealdade a alguma causa agora.
-Aventureiro|Pelo menos concordamos nisso.
-Sir Uiliam|Mas há algo que não posso ignorar.
-Aventureiro|O quê?
-Sir Uiliam|Quando viu um homem cercado por criaturas...
-Sir Uiliam|você entrou na batalha.
-Aventureiro|Eu nem sabia se conseguia lutar.
-Sir Uiliam|Isso torna sua decisão ainda mais significativa.
-Aventureiro|Ou mais estúpida.
-Sir Uiliam|As duas coisas não são necessariamente incompatíveis.
-Ação|O aventureiro olha para Uiliam.
-Aventureiro|Isso foi uma piada?
-Sir Uiliam|Não se acostume.
-Ação|Uiliam fica mais sério novamente.
-Sir Uiliam|Aviant já teve pessoas capazes de representar resistência.
-Sir Uiliam|Heróis cujos nomes faziam outros encontrarem coragem para lutar.
-Aventureiro|Os Cinco?
-Sir Uiliam|Eles são o maior exemplo.
-Sir Uiliam|Mas houve muitos outros depois deles.
-Sir Uiliam|Hoje...
-Ação|Uiliam olha ao redor da taverna.
-Sir Uiliam|não temos ninguém assim.
-Aventureiro|E você acha que isso é tão importante quanto ter soldados?
-Sir Uiliam|Talvez mais.
-Aventureiro|Por quê?
-Sir Uiliam|Porque monstros podem ser enfrentados.
-Pausa|0.6
-Sir Uiliam|Mas quando um povo perde a esperança de que alguém ainda pode enfrentá-los...
-Sir Uiliam|ele começa a acreditar que já perdeu a guerra.
-Ação|O aventureiro permanece pensativo.
-Aventureiro|Então o problema não é falta de gente.
-Ação|Uiliam olha diretamente para ele.
-Sir Uiliam|Não.
+Aventureiro|E quem enfrenta essas criaturas?
+Sir Uiliam|Soldados.
+Sir Uiliam|A Ordem.
+Sir Uiliam|E aventureiros.
+Aventureiro|Como eu?
+Sir Uiliam|Ainda não.
+Aventureiro|“Ainda”?
+Ação|Uiliam quase sorri.
+Sir Uiliam|Há cada vez menos pessoas dispostas a seguir esse caminho.
+Aventureiro|Porque é perigoso.
+Sir Uiliam|Porque muitos não voltam.
+Aventureiro|Faz sentido.
+Sir Uiliam|Faz.
+Ação|Uma pequena pausa.
+Sir Uiliam|Mas as criaturas não desaparecem porque temos medo delas.
+Sir Uiliam|Por isso o que fez hoje chamou minha atenção.
+Aventureiro|Proteger o guarda?
+Sir Uiliam|Você não sabia onde estava.
+Sir Uiliam|Não lembrava quem era.
+Sir Uiliam|Nem sabia se conseguiria lutar.
+Aventureiro|Ele precisava de ajuda.
+Sir Uiliam|Exatamente.
+Ação|Um breve silêncio.
 Sir Uiliam|Não faltam pessoas em Aviant.
-Pausa|0.6
 Sir Uiliam|Faltam pessoas dispostas a lutar.
-Aventureiro|Você fala disso como alguém que pensa muito sobre o assunto.
-Sir Uiliam|É meu dever pensar.
-Aventureiro|E convencer pessoas a lutar também faz parte desse dever?
-Ação|Uiliam demora um pouco mais para responder.
-Sir Uiliam|Quando alguém possui capacidade para proteger os outros...
-Sir Uiliam|acredito que vale a pena mostrar a essa pessoa que sua força pode significar alguma coisa.
-Aventureiro|Mostrar.
-Sir Uiliam|Sim.
-Aventureiro|Não decidir por ela.
-Ação|Uiliam encara o aventureiro.
+Aventureiro|Está tentando me recrutar?
 Sir Uiliam|Não.
-Sir Uiliam|A escolha ainda deve pertencer a ela.
-Pausa|0.6
-Aventureiro|Certo.
-Sir Uiliam|Por quê?
-Aventureiro|Só queria saber.
-Aventureiro|Então já sei onde estou.
-Sir Uiliam|Em parte.
-Aventureiro|Se isso foi apenas “em parte”, começo a sentir falta de quando eu não sabia de nada.
-Sir Uiliam|Logo aprenderá que Aviant possui esse efeito.
+Ação|Uma pausa.
+Sir Uiliam|Ainda não.
+Aventureiro|Você gosta dessa palavra.
+Sir Uiliam|Ela mantém possibilidades abertas.
+Aventureiro|E se eu não quiser ser aventureiro?
+Sir Uiliam|Então não será.
+Aventureiro|Simples assim?
+Sir Uiliam|Sua força pode ajudar pessoas.
+Sir Uiliam|Mas a escolha precisa ser sua.
+Ação|O aventureiro observa Uiliam.
+Aventureiro|Entendi.
+Sir Uiliam|Por enquanto, existe algo mais importante.
+Aventureiro|Descobrir quem sou.
+Sir Uiliam|Exatamente.
 Aventureiro|E agora?
-Sir Uiliam|Isso depende de você.
-Aventureiro|Finalmente uma resposta que gosto.
 Sir Uiliam|Não sabe de onde veio.
-Sir Uiliam|Mas sabe lutar.
-Sir Uiliam|Até descobrir mais sobre si mesmo, talvez seja melhor não viajar sozinho.
+Sir Uiliam|Ainda conhece pouco de Aviant.
+Sir Uiliam|Viajar sozinho não seria prudente.
 Aventureiro|Está oferecendo ajuda?
 Sir Uiliam|Estou.
-Aventureiro|Sem juramento à Ordem?
+Aventureiro|Sem juramento?
 Sir Uiliam|Sem juramento.
-Aventureiro|Sem me transformar em aventureiro contra minha vontade?
-Sir Uiliam|Você parece particularmente preocupado com isso.
-Aventureiro|Acabei de conhecer você.
-Sir Uiliam|Justo.
-Aventureiro|Então, por enquanto...
-Aventureiro|acho que continuarei por perto.
-Sir Uiliam|Por enquanto.
-Ação|Uiliam reconhece a expressão usada pelo aventureiro anteriormente.
-Aventureiro|Você presta atenção.
-Sir Uiliam|É uma habilidade útil.
-Ação|Diário atualizado — O Mundo de Aviant: você descobriu a história da Grande Ruptura, dos Cinco Guerreiros e dos Selos de Vanir. As criaturas continuam além das áreas protegidas e parecem estar aumentando.
-Ação|Novo objetivo: conheça a vila e descubra mais sobre o mundo em que despertou.
+Ação|O aventureiro pensa por um instante.
+Aventureiro|Então fico por perto.
+Sir Uiliam|Por enquanto?
+Aventureiro|Por enquanto.
+Diário atualizado|O Mundo de Aviant: você conheceu a história da Grande Ruptura, dos Cinco Guerreiros e dos Selos de Vanir. Segundo Uiliam, os Selos mantêm as cidades protegidas, enquanto as regiões além delas continuam perigosas. O número de criaturas parece estar aumentando.
+Novo objetivo|Explore a vila e descubra mais sobre Aviant — e sobre quem você era antes de chegar aqui.
 """
 
 const LOCATION_EVENT_SEQUENCES := {

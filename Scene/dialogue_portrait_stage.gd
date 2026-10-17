@@ -53,12 +53,14 @@ func rebuild_portraits() -> void:
 	if count == 0:
 		return
 	var dialogue_width: float = minf(900.0, (viewport_size.x - 24.0) * 0.63)
+	if OS.has_feature("mobile"):
+		dialogue_width = minf(1500.0, (viewport_size.x - 24.0) * 0.60)
 	var side_width: float = maxf(120.0, (viewport_size.x - dialogue_width) * 0.5 - 12.0)
 	var primary_size := Vector2(
 		minf(470.0, side_width),
 		minf(540.0, viewport_size.y * 0.60)
 	)
-	var dialogue_height: float = 360.0 if OS.has_feature("mobile") else 290.0
+	var dialogue_height: float = 390.0 if OS.has_feature("mobile") else 290.0
 	var dialogue_top: float = viewport_size.y - dialogue_height - 18.0
 	var main_entries: Array[Dictionary] = []
 	var npc_entries: Array[Dictionary] = []

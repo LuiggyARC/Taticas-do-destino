@@ -282,6 +282,7 @@ func prepare_battle_stage(
 	save_data["inventory"] = (
 		InventoryManager.get_save_data()
 	)
+	save_data["missions"] = MissionManager.get_save_data()
 	
 	var save_was_written: bool = (
 		write_save_data(

@@ -71,10 +71,7 @@ func _ready():
 func start_game():
 	GameState.should_load_save = false
 	GameState.selected_save_path = ""
-	get_tree().call_deferred(
-		"change_scene_to_file",
-		"res://Scene/Character_Creation.tscn"
-	)
+	SceneTransition.change_scene_to_file("res://Scene/Character_Creation.tscn")
 
 func update_continue_button():
 	var save_exists := has_any_save()
@@ -306,7 +303,7 @@ func load_selected_save(
 		)
 	)
 	
-	get_tree().change_scene_to_file(
+	SceneTransition.change_scene_to_file(
 		"res://Scene/main.tscn"
 	)
 

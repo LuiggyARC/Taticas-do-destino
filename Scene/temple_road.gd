@@ -1,20 +1,102 @@
 extends Control
 
+const TempleRoadDatabaseScript = preload("res://Scene/temple_road_database.gd")
+const VillageStoryEventScript = preload("res://Scene/village_story_event.gd")
 const ROAD_MAP_PATH := "res://Assets/Maps/Caminho do templo.jpg"
 const FEEDBACK_URL := "https://docs.google.com/forms/d/e/1FAIpQLSdVqP7LyWeAEgfNX19Q9HgOJkb5CmsrIM9nA867sEn6D13Aiw/viewform?usp=publish-editor"
+const ROAD_STORY_EVENT_ID := "temple_road_litz_arievilo"
+const ROAD_CASTS := {
+	"road": ["Sir Uiliam", "Aniri"],
+	"meeting": ["Aniri", "Litz", "Arievilo"],
+	"capital": ["Sir Uiliam", "Litz", "Arievilo"],
+	"forest": ["Aniri", "Litz", "Arievilo"],
+	"book": ["Sir Uiliam", "Litz", "Arievilo"],
+	"together": ["Aniri", "Litz", "Arievilo"],
+	"rift": ["Aventureiro", "Aniri", "Arievilo"],
+	"directions": ["Sir Uiliam", "Litz", "Arievilo"],
+	"farewell": ["Aniri", "Litz", "Arievilo"],
+	"after": ["Sir Uiliam", "Aniri"]
+}
 
 var objective_label: Label
 var menu_button: Button
 var test_end_overlay: ColorRect
 var feedback_status_label: Label
+var story_event_controller: VillageStoryEvent
 
 
 func _ready() -> void:
 	GameState.current_location = "temple_road"
 	_build_background()
 	_build_header()
-	objective_label.text = "Versão de teste concluída"
-	call_deferred("_show_test_end")
+	objective_label.text = "Estrada para o templo de Hashagur"
+	call_deferred("_play_road_story")
+
+
+func _play_road_story() -> void:
+	if SaveManager.has_completed_story_event(ROAD_STORY_EVENT_ID):
+		_advance_to_temple_gate()
+		return
+	story_event_controller = VillageStoryEventScript.new()
+	add_child(story_event_controller)
+	for scene_id_variant in TempleRoadDatabaseScript.ORDER:
+		var scene_id: String = str(scene_id_variant)
+		var scene: Array[Dictionary] = TempleRoadDatabaseScript.get_scene(scene_id)
+		if scene.is_empty():
+			push_warning("Cena da estrada não encontrada: " + scene_id)
+			return
+		var cast: Array[String] = []
+		for speaker in ROAD_CASTS.get(scene_id, []):
+			cast.append(str(speaker))
+		await story_event_controller.start_event(
+			"temple_road_" + scene_id, scene, cast, "Sir Uiliam"
+		)
+	if not _save_road_story_progress():
+		push_warning("Não foi possível salvar o progresso da estrada para o templo.")
+		_show_test_end()
+		return
+	objective_label.text = "Ecos do Templo — encontre Hashagur"
+	_advance_to_temple_gate()
+
+
+func _advance_to_temple_gate() -> void:
+	var save_path: String = SaveManager.get_active_save_path()
+	var save_data: Dictionary = SaveManager.read_save_data(save_path)
+	if not save_data.is_empty():
+		save_data["current_location"] = "temple_gate"
+		if not SaveManager.write_save_data(save_path, save_data):
+			push_warning("Não foi possível salvar a viagem ao templo.")
+			return
+	GameState.current_location = "temple_gate"
+	SceneTransition.change_scene_to_file("res://Scene/temple_gate.tscn")
+
+
+func _save_road_story_progress() -> bool:
+	var save_path: String = SaveManager.get_active_save_path()
+	var save_data: Dictionary = SaveManager.read_save_data(save_path)
+	if save_data.is_empty():
+		return false
+	var old_missions: Dictionary = MissionManager.get_save_data()
+	MissionManager.update_mission_description(
+		"hero_origin",
+		"Arievilo perdeu parte das lembranças durante um ataque próximo a uma fenda. Descubra se as fendas estão ligadas ao seu passado."
+	)
+	MissionManager.update_mission_title("hashagur_temple", "Ecos do Templo")
+	MissionManager.update_mission_description(
+		"hashagur_temple",
+		"Chegue ao monastério e encontre Hashagur. Descubra o que ele sabe sobre o culto e os acontecimentos recentes."
+	)
+	MissionManager.update_mission_progress("hashagur_temple", "road_conversation_completed", true)
+	save_data["missions"] = MissionManager.get_save_data()
+	var completed_events: Array = save_data.get("completed_story_events", [])
+	if ROAD_STORY_EVENT_ID not in completed_events:
+		completed_events.append(ROAD_STORY_EVENT_ID)
+	save_data["completed_story_events"] = completed_events
+	save_data["world_map_node"] = "bridge"
+	if not SaveManager.write_save_data(save_path, save_data):
+		MissionManager.load_save_data(old_missions)
+		return false
+	return true
 
 
 func _build_background() -> void:
@@ -112,6 +194,15 @@ func _show_test_end() -> void:
 	message.add_theme_font_size_override("font_size", 20)
 	content.add_child(message)
 
+	var map_button := Button.new()
+	map_button.text = "Explorar o mapa de Aviant"
+	map_button.custom_minimum_size = Vector2(0, 60)
+	map_button.add_theme_font_size_override("font_size", 22)
+	map_button.pressed.connect(func() -> void:
+		SceneTransition.change_scene_to_file("res://Scene/world_map.tscn")
+	)
+	content.add_child(map_button)
+
 	var feedback_button := Button.new()
 	feedback_button.text = "Contar minha experiência"
 	feedback_button.custom_minimum_size = Vector2(0, 60)
@@ -139,4 +230,4 @@ func _on_feedback_pressed() -> void:
 
 
 func _on_menu_pressed() -> void:
-	get_tree().change_scene_to_file("res://Scene/main_menu.tscn")
+	SceneTransition.change_scene_to_file("res://Scene/main_menu.tscn")

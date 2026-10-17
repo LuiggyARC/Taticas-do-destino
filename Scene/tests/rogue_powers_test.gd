@@ -9,10 +9,9 @@ const NpcDatabase = preload("res://Scene/npc_database.gd")
 
 func _ready() -> void:
 	var powers: Array = RoguePowers.get_powers()
-	assert(powers.size() == 3)
-	assert(str(powers[0]["frequency"]) == "Sem limite")
-	assert(str(powers[1]["frequency"]) == "Por encontro")
-	assert(str(powers[2]["frequency"]) == "Diário")
+	assert(powers.size() == 2)
+	assert(str(powers[0]["frequency"]) == "Por encontro")
+	assert(str(powers[1]["frequency"]) == "Diário")
 
 	var rogue_feats: Array = FeatDatabase.get_available_feats_for_character(
 		"Ladino", "Humano", 1, false, [], {"dexterity": 14}
@@ -25,6 +24,10 @@ func _ready() -> void:
 	assert(aniri_data["feats"].has("Passos de Veludo"))
 	assert(aniri_data["feats"].has("Olho para Brechas"))
 	assert(not aniri_data["feats"].has("Foco em Arma: Espada Curta"))
+	var aniri_sheet: Node2D = NpcScript.new()
+	aniri_sheet.setup_from_npc_data(aniri_data)
+	assert(aniri_sheet.hide_bonus == int(aniri_data["skills"]["hide"]))
+	aniri_sheet.free()
 
 	var hero: Node2D = HeroScript.new()
 	hero.character_class = "Ladino"

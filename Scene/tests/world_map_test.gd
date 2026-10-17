@@ -1,0 +1,30 @@
+extends Node
+
+const Rules = preload("res://Scene/world_map_rules.gd")
+const MapScene = preload("res://Scene/world_map.tscn")
+const StoryDialog = preload("res://Scene/story_dialog.gd")
+
+
+func _ready() -> void:
+	assert(Rules.map_path(false) == "res://Assets/Maps/Mapa 1.jpg")
+	assert(Rules.map_path(true) == "res://Assets/Maps/Mapa 2.jpg")
+	assert(ResourceLoader.exists(Rules.BEFORE_MAP))
+	assert(ResourceLoader.exists(Rules.AFTER_MAP))
+	assert(Rules.is_unlocked("village", false, false))
+	assert(not Rules.is_unlocked("bridge", false, false))
+	assert(Rules.is_unlocked("bridge", true, false))
+	assert(not Rules.is_unlocked("citadel", true, false))
+	assert(Rules.is_unlocked("citadel", true, true))
+	assert(Rules.can_travel("village", "bridge", true, true))
+	assert(Rules.can_travel("bridge", "citadel", true, true))
+	assert(not Rules.can_travel("village", "citadel", true, true))
+	assert(not Rules.can_travel("bridge", "citadel", true, false))
+	assert(MapScene != null)
+	var dialog: StoryDialogBox = StoryDialog.new()
+	assert(dialog.get_speaker_portrait_path("Litz") == "res://Assets/Characters/Litz.png")
+	assert(dialog.get_speaker_portrait_path("Arievilo") == "res://Assets/Maps/Arievilo.png")
+	assert(ResourceLoader.exists(dialog.get_speaker_portrait_path("Litz")))
+	assert(ResourceLoader.exists(dialog.get_speaker_portrait_path("Arievilo")))
+	dialog.free()
+	print("World map test passed")
+	get_tree().quit(0)

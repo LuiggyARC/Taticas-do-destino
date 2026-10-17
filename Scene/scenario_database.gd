@@ -1458,7 +1458,7 @@ static func is_round_event(
 	
 	return false
 
-static func _stage_2_dialogues(script: String) -> Array:
+static func _scripted_dialogues(script: String) -> Array:
 	var dialogues: Array = []
 	for raw_line in script.strip_edges().split("\n"):
 		var line: String = raw_line.strip_edges()
@@ -1480,210 +1480,107 @@ static func get_stage_2_victory_intro_data() -> Dictionary:
 		"aniri_position": Vector2i(24, 7),
 		"uiliam_approach_position": Vector2i(22, 9),
 		"camera_focus_position": Vector2i(23, 8),
-		"opening_dialogue_count": 18,
-		"dialogues_before_approach": _stage_2_dialogues("""
+		"opening_dialogue_count": 10,
+		"dialogues_before_approach": _scripted_dialogues("""
 Ação|O último rato cai.
-Ação|O aventureiro recupera o fôlego. Uiliam observa os corpos espalhados pelo porão.
 [NOME_DO_JOGADOR]|Então esses eram os ratos.
 Sir Uiliam|Aparentemente.
-[NOME_DO_JOGADOR]|Depois das criaturas lá fora, esperava alguma coisa pior.
-Sir Uiliam|Não subestime aquilo que possui dentes.
-Ação|O aventureiro começa a observar o porão.
-Ação|Entre algumas caixas, vê ferramentas semelhantes às que Jhon descreveu.
+Ação|O aventureiro observa o porão e encontra algumas ferramentas.
 [NOME_DO_JOGADOR]|Uiliam.
 Sir Uiliam|Sim?
 [NOME_DO_JOGADOR]|Ratos costumam guardar martelos?
-Ação|Uiliam olha.
 Sir Uiliam|Não.
 Voz desconhecida|Talvez sejam ratos particularmente organizados.
-Ação|Silêncio.
-Ação|Os dois imediatamente olham para o outro lado do porão.
-[NOME_DO_JOGADOR]|Quem disse isso?
-Ação|Algumas caixas se mexem.
-Ação|Uma pequena figura surge lentamente detrás de tábuas empilhadas.
-Ação|É uma halfling já de certa idade. Ela carrega uma bolsa exageradamente cheia. Um dos martelos de Jhon está preso ao cinto e várias ferramentas aparecem entre seus pertences.
-Aniri|Antes que tirem conclusões precipitadas...
-Ação|Ela olha para o próprio cinto.
-Ação|Depois para a bolsa.
-Aniri|...admito que minha situação visual não está ajudando.
-[NOME_DO_JOGADOR]|Acho que encontramos o rato que estava levando as ferramentas.
+Ação|Os dois se viram.
+Ação|Uma halfling de certa idade surge atrás das caixas. Carrega uma bolsa cheia e uma das ferramentas de Jhon está presa ao cinto.
+Aniri|Antes que tirem conclusões...
+Ação|Ela olha para a própria bolsa.
+Aniri|...admito que a situação não está me favorecendo.
+[NOME_DO_JOGADOR]|Acho que encontramos o rato.
 Aniri|Halfling.
-Aniri|A diferença é importante.
-SR. UILIAM|Coloque a bolsa no chão.
-Aniri|Podemos começar com um “boa tarde”?
-SR. UILIAM|A bolsa.
-Ação|Aniri observa Uiliam por alguns segundos.
-Aniri|Paladino?
+Aniri|Diferença importante.
+Sir Uiliam|A bolsa.
+Aniri|Nem um “boa tarde”?
+Sir Uiliam|Aniri.
+Aniri|Nem sabe meu nome ainda.
+Sir Uiliam|A bolsa.
+Aniri|Paladino.
+Aniri|Agora faz sentido.
 """),
-		"dialogues_after_approach": _stage_2_dialogues("""
-Ação|Uiliam se aproxima dela.
-SR. UILIAM|Isso importa?
-Aniri|Explica muita coisa.
-[NOME_DO_JOGADOR]|Especialmente a maneira como ele pede as coisas.
-SR. UILIAM|[NOME_DO_JOGADOR].
-[NOME_DO_JOGADOR]|Só estou observando.
-Ação|Aniri suspira e coloca a bolsa no chão.
-Aniri|Muito bem.
-Aniri|Sem movimentos bruscos.
-Aniri|Principalmente porque minhas costas não permitem mais.
-Ação|Uiliam abre a bolsa.
-Ação|Dentro estão ferramentas, moedas e outros objetos pertencentes à carpintaria.
-SR. UILIAM|Estas são as ferramentas de Jhon.
-[NOME_DO_JOGADOR]|Então realmente não eram os ratos.
-Aniri|Eu gostaria de dizer que eram.
-Aniri|Resolveria grande parte dos meus problemas.
-SR. UILIAM|Você roubou este estabelecimento.
-Aniri|Tecnicamente—
-Ação|Uiliam encara Aniri.
+		"dialogues_after_approach": _scripted_dialogues("""
+Ação|Aniri coloca a bolsa no chão. Dentro estão ferramentas, moedas e outros objetos da carpintaria.
+[NOME_DO_JOGADOR]|Então não foram os ratos.
+Aniri|Eu realmente gostaria que tivessem sido.
+Sir Uiliam|Você roubou Jhon.
 Aniri|Sim.
-Aniri|Roubei.
-SR. UILIAM|Pelo menos não acrescentou mentira ao crime.
-Aniri|Com a minha idade, mentir dá mais trabalho do que confessar.
-SR. UILIAM|Roubo não se torna aceitável porque decidiu tratá-lo como piada.
-Ação|O sorriso de Aniri diminui.
-Aniri|Eu sei.
-[NOME_DO_JOGADOR]|Então por quê?
+Sir Uiliam|Sem desculpas?
+Aniri|Tenho algumas.
+Aniri|Nenhuma muito boa.
+[NOME_DO_JOGADOR]|Por quê?
 Ação|Aniri olha para ele.
-Aniri|Por quê o quê?
-[NOME_DO_JOGADOR]|Você estava escondida no porão de outra pessoa...
-Ação|Ele aponta para a bolsa.
-[NOME_DO_JOGADOR]|com ferramentas roubadas...
-Ação|Olha para os ratos.
-[NOME_DO_JOGADOR]|e cercada por ratos gigantes.
-[NOME_DO_JOGADOR]|Imagino que exista uma história.
-Aniri|Existe.
-Aniri|Não é uma das minhas melhores.
-[NOME_DO_JOGADOR]|Tenho tempo.
-SR. UILIAM|Eu também quero ouvi-la.
-Aniri|Naturalmente.
-Ação|Ela cruza os braços.
 Aniri|Meu nome é Aniri.
 [NOME_DO_JOGADOR]|[NOME_DO_JOGADOR].
 Aniri|Prazer.
 Ação|Ela olha para Uiliam.
 Aniri|E você é obviamente um paladino.
-Ação|Uiliam assume postura.
-SR. UILIAM|Sou Uiliam, paladino a serviço da Ordem de Vanir. Consagrei minha—
+Ação|Uiliam assume sua postura.
+Sir Uiliam|Sou Uiliam, paladino a serviço da Ordem de Vanir. Consagrei minha—
 Aniri|Não precisava provar.
-Ação|O aventureiro segura um sorriso.
-SR. UILIAM|...
+Ação|Silêncio.
 Aniri|Desculpe.
 Aniri|Continue.
-SR. UILIAM|Não.
+Sir Uiliam|Não.
 Aniri|Uma pena.
-[NOME_DO_JOGADOR]|Aniri.
-Aniri|Sim?
-[NOME_DO_JOGADOR]|Por que roubou essas coisas?
-Aniri|Porque precisava delas.
-SR. UILIAM|Essa costuma ser a justificativa de quem rouba.
-Aniri|Não estou dizendo que fiz certo.
-Aniri|Estou dizendo por que fiz.
-Ação|Ela olha para a bolsa.
+[NOME_DO_JOGADOR]|Ainda não respondeu.
 Aniri|Eu estava indo embora.
-[NOME_DO_JOGADOR]|Embora da vila?
-SR. UILIAM|Para onde pretendia ir?
-Aniri|Para fora dos muros como sempre.
-Ação|Uiliam fica mais atento.
+[NOME_DO_JOGADOR]|Da vila?
+Aniri|Sim.
 [NOME_DO_JOGADOR]|Sozinha?
 Aniri|Esse era o plano.
-[NOME_DO_JOGADOR]|Você ouviu a parte sobre as criaturas lá fora?
-Aniri|Ouvi durante a maior parte da minha vida.
-[NOME_DO_JOGADOR]|E mesmo assim decidiu sair?
-Aniri|Justamente por isso.
-Aniri|Passei anos vendo o mundo passar diante de mim.
-Aniri|Mercadores chegavam contando histórias de lugares que nunca vi.
-Aniri|Soldados voltavam das estradas.
-Aniri|Aventureiros apareciam cobertos de lama, sangue e coisas que eu preferia não identificar.
-Aniri|E eu?
-Ação|Ela dá de ombros.
-Aniri|Acordava.
-Aniri|Trabalhava.
-Aniri|Comia.
-Aniri|Dormia.
-Aniri|Depois fazia tudo novamente.
-SR. UILIAM|Uma vida tranquila não é motivo de vergonha.
-Aniri|Nunca disse que era.
-Aniri|Só deixou de ser a vida que eu queria.
-Ação|Breve silêncio.
-Aniri|Durante anos pensei: “algum dia”.
-Aniri|Algum dia vou atravessar aqueles portões.
-Aniri|Algum dia vou ver essas florestas.
-Aniri|Algum dia vou descobrir se metade das histórias que contam nas tavernas é verdade.
-Ação|Ela olha para as próprias mãos.
-Aniri|Até perceber que “algum dia” estava começando a ficar perigosamente parecido com “nunca”.
-Ação|O aventureiro observa Aniri com mais atenção.
-Aniri|Halflings vivem bastante.
-Aniri|Mas não para sempre.
-[NOME_DO_JOGADOR]|Então você resolveu sair da sua cidade?
-Aniri|Sim.
-[NOME_DO_JOGADOR]|Sem equipamento.
-Aniri|Sim.
-[NOME_DO_JOGADOR]|Sem dinheiro suficiente.
-Aniri|Também.
-Aniri|Não precisava incluir essa parte.
-[NOME_DO_JOGADOR]|Só estou tentando entender o plano.
-Aniri|O plano tinha algumas falhas.
-SR. UILIAM|Então decidiu tornar-se ladra.
-Aniri|Não.
-Ação|Aniri olha diretamente para Uiliam.
-Aniri|Decidi me tornar aventureira.
+Ação|O aventureiro olha para a bolsa.
+[NOME_DO_JOGADOR]|Sem dinheiro e sem equipamento.
+Aniri|O plano tinha falhas.
+Sir Uiliam|Então resolveu roubar.
+Aniri|Resolvi virar aventureira.
 Ação|Ela aponta para a bolsa.
-Aniri|Ser ladra foi uma decisão ruim tomada no caminho.
+Aniri|Isso foi uma péssima decisão no caminho.
 [NOME_DO_JOGADOR]|Uma distinção importante.
-SR. UILIAM|Não tão importante quanto ela acredita.
-Aniri|Provavelmente não.
-SR. UILIAM|Você pretende enfrentar criaturas?
-Aniri|Pretendo.
-SR. UILIAM|Sabe quantos aventureiros morrem fora dessas muralhas?
-Aniri|Não.
-SR. UILIAM|Muitos.
-Aniri|Imagino.
-SR. UILIAM|E ainda pretende sair?
-Aniri|Sim.
-SR. UILIAM|Por quê?
-Ação|Aniri demora um pouco para responder.
-Aniri|Porque estou cansada de esperar que outras pessoas façam isso por mim.
-Ação|Uiliam fica em silêncio.
-Aniri|Passei a vida inteira protegida por muralhas que outras pessoas defenderam.
-Aniri|Dormindo enquanto alguém patrulhava.
-Aniri|Comendo enquanto alguém mantinha as estradas abertas.
-Aniri|Esperando que aventureiros voltassem vivos para que eu pudesse continuar fingindo que o mundo terminava nos portões da cidade.
-Ação|A expressão de Uiliam muda discretamente.
-Aniri|Se existem monstros lá fora...
-Aniri|então quero passar o que me resta fazendo alguma coisa a respeito.
-Ação|Silêncio.
-[NOME_DO_JOGADOR]|Você está com medo?
-Ação|Aniri olha para ele.
+Sir Uiliam|Não tanto quanto ela gostaria.
+Sir Uiliam|Por que se tornar aventureira agora?
+Ação|Aniri hesita.
+Aniri|Porque esperei demais.
+Aniri|Passei anos vendo outras pessoas atravessarem aqueles portões enquanto eu pensava...
+Aniri|“Algum dia.”
+Ação|Ela dá de ombros.
+Aniri|Até perceber que “algum dia” estava ficando parecido demais com “nunca”.
+[NOME_DO_JOGADOR]|E resolveu sair.
+Aniri|Enquanto ainda posso.
+Sir Uiliam|Sabe o que existe além dos muros?
+Aniri|Monstros.
+Aniri|Estradas ruins.
+Aniri|E várias maneiras desagradáveis de morrer.
+[NOME_DO_JOGADOR]|Está com medo?
 Aniri|Muito.
 [NOME_DO_JOGADOR]|Não parece.
 Aniri|Anos de prática.
-Ação|Pequena pausa.
-Aniri|Coragem não significa não ter medo, certo?
-Ação|Uiliam olha para ela.
-SR. UILIAM|Não.
-SR. UILIAM|Significa decidir o que fazer apesar dele.
+Ação|Uiliam observa Aniri.
+Sir Uiliam|Coragem não é ausência de medo.
+Sir Uiliam|É continuar apesar dele.
 Aniri|Então talvez eu tenha alguma.
-SR. UILIAM|Ainda assim...
-Ação|Ele olha para a bolsa.
-SR. UILIAM|isso não apaga o que fez.
+Sir Uiliam|Ainda existe o roubo.
 Aniri|Eu sei.
-SR. UILIAM|Jhon trabalhou por tudo que colocou aí.
-Aniri|Eu sei.
-SR. UILIAM|E alguém que deseja proteger outras pessoas precisa começar respeitando aquilo que pertence a elas.
+Sir Uiliam|Querer mudar de vida não lhe dá direito de prejudicar outra pessoa.
 Ação|Aniri olha para a bolsa.
 Aniri|Então devolvo tudo.
-[NOME_DO_JOGADOR]|Só isso?
-Aniri|Posso devolver mais do que roubei?
-[NOME_DO_JOGADOR]|Quero dizer... está disposta a encarar Jhon?
-Ação|Aniri fica muito menos confiante.
-Aniri|Preferia enfrentar mais ratos.
-SR. UILIAM|Aniri.
+[NOME_DO_JOGADOR]|E Jhon?
+Aniri|...
+[NOME_DO_JOGADOR]|Vai falar com ele?
+Aniri|Preferia mais ratos.
+Sir Uiliam|Aniri.
 Aniri|Sim.
 Aniri|Vou falar com ele.
-SR. UILIAM|E reparar qualquer prejuízo que tenha causado.
-Aniri|Também.
 [NOME_DO_JOGADOR]|Sem fugir?
-Aniri|Agora vocês estão apenas tornando isso doloroso.
+Aniri|Vocês realmente gostam dessa parte.
 [NOME_DO_JOGADOR]|Sem fugir?
 Aniri|Sem fugir.
 """)
@@ -1696,83 +1593,43 @@ static func get_stage_2_victory_choice_data() -> Dictionary:
 		"options": [
 			{
 				"id": "give_aniri_a_chance",
-				"button_text": "Se ela devolver tudo e reparar o prejuízo, merece uma chance.",
-				"dialogues": _stage_2_dialogues("""
-[NOME_DO_JOGADOR]|Se ela devolver tudo e reparar o prejuízo...
+				"button_text": "Se reparar o prejuízo, merece uma chance.",
+				"dialogues": _scripted_dialogues("""
+[NOME_DO_JOGADOR]|Se devolver tudo e reparar o prejuízo...
 [NOME_DO_JOGADOR]|acho que merece uma chance.
-Ação|Aniri olha para ele, surpresa.
-Aniri|Você me conhece há quanto tempo?
-[NOME_DO_JOGADOR]|Poucos minutos.
-Aniri|E já confia em mim?
-[NOME_DO_JOGADOR]|Não disse isso.
+Aniri|Já confia em mim?
+[NOME_DO_JOGADOR]|Não.
 Aniri|Ah.
-[NOME_DO_JOGADOR]|Disse que acho que merece a oportunidade de provar que está falando sério.
+[NOME_DO_JOGADOR]|Mas pode provar que está falando sério.
 Ação|Aniri sorri discretamente.
-Aniri|Gosto mais dessa resposta.
-Ação|Uiliam olha para o aventureiro.
-SR. UILIAM|Tem certeza?
-[NOME_DO_JOGADOR]|Você acabou de passar um bom tempo me dizendo que Aviant precisa de pessoas dispostas a lutar.
-Ação|Pequena pausa.
-[NOME_DO_JOGADOR]|Encontramos uma.
-Ação|Uiliam olha para Aniri.
-SR. UILIAM|Encontramos alguém dizendo que está disposta.
-Aniri|Posso provar.
-SR. UILIAM|Então prove.
-SR. UILIAM|Devolva o que roubou.
-SR. UILIAM|Repare o prejuízo.
-SR. UILIAM|E não volte a roubar daqueles que afirma querer proteger.
+Aniri|Melhor.
+Sir Uiliam|Então prove.
+Sir Uiliam|Devolva o que roubou e cumpra sua palavra.
 Aniri|Justo.
-SR. UILIAM|Não é absolvição.
-Aniri|Também não pedi uma.
-Ação|Uiliam assente.
-SR. UILIAM|Muito bem.
-Aniri|Então isso significa que posso acompanhar vocês?
+Aniri|E depois posso acompanhar vocês?
 Ação|Uiliam olha para o aventureiro.
-SR. UILIAM|Isso não cabe apenas a mim decidir.
-Ação|Aniri também olha para o aventureiro.
+Sir Uiliam|Isso não cabe apenas a mim decidir.
 [NOME_DO_JOGADOR]|Primeiro Jhon.
-Aniri|Eu estava torcendo para que esquecessem essa parte.
+Aniri|Claro que vocês lembrariam dessa parte.
 """)
 			},
 			{
 				"id": "jhon_decides",
-				"button_text": "Ela roubou Jhon. Ele deve decidir o que acontece agora.",
-				"dialogues": _stage_2_dialogues("""
-[NOME_DO_JOGADOR]|Ela roubou Jhon.
-Ação|Aniri perde o sorriso.
-[NOME_DO_JOGADOR]|Não acho que nós devamos decidir simplesmente que está tudo bem.
-SR. UILIAM|Concordo.
-Aniri|Isso parece ruim para mim.
-[NOME_DO_JOGADOR]|Você disse que devolveria tudo.
-Aniri|E vou.
-[NOME_DO_JOGADOR]|Então vamos começar por aí.
-[NOME_DO_JOGADOR]|Jhon foi quem perdeu as ferramentas e as moedas.
-[NOME_DO_JOGADOR]|Ele deve saber o que aconteceu e decidir como quer resolver isso.
+				"button_text": "Jhon deve decidir o que acontece.",
+				"dialogues": _scripted_dialogues("""
+[NOME_DO_JOGADOR]|Você roubou Jhon.
+[NOME_DO_JOGADOR]|Acho que ele deve decidir como isso termina.
 Ação|Aniri respira fundo.
 Aniri|Justo.
-SR. UILIAM|Não cabe a nós absolvê-la de algo que não foi cometido contra nós.
-Aniri|Quando vocês dois concordam, fica muito mais difícil discutir.
-[NOME_DO_JOGADOR]|Pode tentar.
-Aniri|Não.
-Aniri|Desta vez vocês estão certos.
-Ação|Ela olha para a bolsa.
-Aniri|Vou devolver tudo.
-SR. UILIAM|E se Jhon exigir reparação?
+Sir Uiliam|Se ele exigir reparação?
 Aniri|Eu reparo.
-[NOME_DO_JOGADOR]|E se ele quiser chamar os guardas?
-Ação|Aniri fica em silêncio.
-Aniri|Então...
-Ação|Ela engole em seco.
-Aniri|eu fui eu quem entrou aqui.
-Aniri|Eu fui quem roubou.
-Aniri|Não vou fingir que não sabia o risco.
-Ação|O aventureiro percebe que, desta vez, ela não está brincando.
-SR. UILIAM|Muito bem.
-Ação|Uiliam observa Aniri.
-SR. UILIAM|Se realmente deseja mudar de caminho...
-SR. UILIAM|começar assumindo as consequências é uma boa primeira escolha.
-Aniri|Não poderia ser uma primeira escolha menos desconfortável?
-SR. UILIAM|Não.
+[NOME_DO_JOGADOR]|E se chamar os guardas?
+Ação|Aniri perde o sorriso.
+Aniri|Então assumo o que fiz.
+Ação|Uiliam assente.
+Sir Uiliam|Um bom começo.
+Aniri|Não poderia ser um começo menos desconfortável?
+Sir Uiliam|Não.
 Aniri|Imaginei.
 """)
 			}
@@ -1782,44 +1639,27 @@ Aniri|Imaginei.
 
 static func get_stage_2_victory_conclusion_data() -> Dictionary:
 	return {
-		"dialogues": _stage_2_dialogues("""
-[NOME_DO_JOGADOR]|Você realmente pretendia carregar tudo isso?
-Aniri|Eu não disse que meu plano era bom.
-[NOME_DO_JOGADOR]|Estou começando a perceber.
-Ação|Aniri termina.
-Aniri|Pronto.
-Ação|Ela pega apenas os próprios pertences.
-Aniri|Então...
-Aniri|se eu sobreviver à conversa com o carpinteiro...
-Aniri|como alguém começa a ser aventureiro?
-SR. UILIAM|Normalmente não roubando uma carpintaria.
-Aniri|Vocês insistem muito nesse detalhe.
-[NOME_DO_JOGADOR]|É um detalhe bastante grande.
-Aniri|Para você talvez.
-Ação|Ela olha para o aventureiro.
-Ação|Aniri fica em silêncio por um instante.
-Aniri|Ponto para você.
-Aniri|Sabe...
-Aniri|acho que vou gostar de viajar com você.
+		"dialogues": _scripted_dialogues("""
+Ação|Aniri pega a bolsa.
+Aniri|Então vamos descobrir se minha carreira de aventureira termina antes mesmo de sair desta carpintaria.
+[NOME_DO_JOGADOR]|Começou muito bem.
+Aniri|Você é sempre tão encorajador?
+[NOME_DO_JOGADOR]|Ainda estou descobrindo.
+Ação|Aniri olha para ele por um instante.
+Aniri|Acho que vou gostar de viajar com você.
 [NOME_DO_JOGADOR]|Ninguém disse que você vai.
 Aniri|Ainda.
-Ação|Uiliam observa os dois.
-SR. UILIAM|Primeiro, vamos falar com Jhon.
-Aniri|Vocês realmente sabem acabar com um momento.
-Ação|Ela começa a seguir em direção à escada.
-Aniri|Muito bem.
-Aniri|Vamos descobrir se minha carreira de aventureira termina antes mesmo de eu sair da carpintaria.
-Ação|O aventureiro começa a acompanhá-la.
-[NOME_DO_JOGADOR]|Pelo menos terá sido uma carreira memorável.
-Aniri|Está aprendendo.
+Sir Uiliam|Primeiro, Jhon.
+Aniri|Vocês sabem acabar com um momento.
+Ação|Os três seguem para a escada.
 """),
 		"mission": {
 			"id": "aniri_second_chance",
 			"title": "Uma Segunda Chance",
 			"description": (
-				"Aniri roubou ferramentas, moedas e suprimentos para tentar iniciar sua jornada. "
-				+ "Ela concordou em devolver o que pegou e enfrentar as consequências.\n"
-				+ "Objetivo: leve Aniri até Jhon e ajude-a a reparar o prejuízo causado."
+				"Aniri roubou ferramentas e suprimentos para tentar iniciar sua própria jornada. "
+				+ "Ela concordou em devolver tudo e enfrentar Jhon.\n"
+				+ "Objetivo: leve Aniri até Jhon."
 			),
 			"status": "active"
 		},
@@ -1839,25 +1679,50 @@ static func get_scenario_victory_sequence(
 				"speaker_id": "Sir Uiliam",
 				"speaker_name": "Sir Uiliam",
 				"guard_survival_bonus_gold": 10,
-				"guard_survival_dialogues": [
-					{
-						"speaker_name": "Soldado Ferido",
-						"text": "Graças a vocês, ainda estou vivo. Aceitem estas 10 peças de ouro. Vou acompanhá-los até a vila."
-					}
-				],
-				"dialogues": [
-					{
-					},
-					{
-						"text": "Mas antes de prosseguirmos, permita-me saber: como devo chamá-lo?"
-					},
-					{
-						"text": "Então és [NOME_DO_JOGADOR]. É uma honra conhecê-lo. Você me parece ser um aventureiro. O que faz por estas áreas? Aventureiros tornaram-se uma raridade em Aviant... mas temo que isso não seja mero acaso."
-					},
-					{
-						"text": "Antes de me contar, venha. Retornemos à aldeia. Partilharemos um cálice de vinho e, com a devida calma, conversaremos sobre aquilo que está acontecendo nestas terras."
-					}
-				],
+				"dialogues": _scripted_dialogues("""
+Narrador|A última criatura cai. O aventureiro observa a própria arma.
+Sir Uiliam|Lutou bem.
+[NOME_DO_JOGADOR]|Eu nem sabia que conseguia lutar.
+Sir Uiliam|Não se lembra de ter aprendido?
+[NOME_DO_JOGADOR]|Não. Nem de onde vim.
+Sir Uiliam|Do que se lembra?
+[NOME_DO_JOGADOR]|Só de estar aqui.
+Sir Uiliam|E mesmo assim entrou na batalha para proteger um desconhecido.
+[NOME_DO_JOGADOR]|Ele precisava de ajuda.
+Sir Uiliam|Isso diz algo sobre quem você é.
+[NOME_DO_JOGADOR]|Onde estamos?
+Sir Uiliam|Aviant.
+[NOME_DO_JOGADOR]|Nunca ouvi esse nome.
+Sir Uiliam|Então temos mais para conversar do que imaginei.
+[NOME_DO_JOGADOR]|E essas criaturas?
+Sir Uiliam|Explicarei na vila. Venha conosco.
+[NOME_DO_JOGADOR]|Talvez lá eu descubra por que sei usar esta arma.
+Sir Uiliam|Talvez.
+"""),
+				"guard_survival_dialogues": _scripted_dialogues("""
+Narrador|O guarda se aproxima.
+Soldado Ferido|Você salvou minha vida.
+Narrador|Ele entrega uma pequena bolsa.
+Recompensa|+10 peças de ouro.
+Soldado Ferido|Considere um agradecimento.
+Soldado Ferido|Também estou voltando para a vila.
+Soldado Ferido|Mostro o caminho.
+Sir Uiliam|Então vamos juntos.
+"""),
+				"guard_death_dialogues": _scripted_dialogues("""
+Narrador|O aventureiro observa o corpo do guarda.
+[NOME_DO_JOGADOR]|Não consegui protegê-lo.
+Sir Uiliam|Você tentou.
+Sir Uiliam|Mas ainda devemos tentar.
+[NOME_DO_JOGADOR]|Vamos.
+"""),
+				"convergence_dialogues": _scripted_dialogues("""
+Narrador|O grupo segue pela estrada.
+[NOME_DO_JOGADOR] (pensamento)|Não sei quem sou.
+[NOME_DO_JOGADOR] (pensamento)|Mas alguma coisa em mim sabia que eu precisava ajudar.
+Narrador|Cenário 1 concluído.
+Novo objetivo|Siga Sir Uiliam até a vila. Encontre-o na taverna e descubra mais sobre Aviant.
+"""),
 				"hero_village_exit": Vector2i(
 					33,
 					12
@@ -1875,6 +1740,21 @@ static func get_scenario_victory_sequence(
 		
 		_:
 			return {}
+
+
+static func assemble_stage_1_victory_dialogues(
+	sequence_data: Dictionary,
+	guard_survived: bool
+) -> Array:
+	var dialogues: Array = sequence_data.get("dialogues", []).duplicate()
+	if guard_survived:
+		dialogues.append_array(sequence_data.get("guard_survival_dialogues", []))
+	else:
+		dialogues.append_array(sequence_data.get("guard_death_dialogues", []))
+	dialogues.append_array(sequence_data.get("convergence_dialogues", []))
+	return dialogues
+
+
 static func get_scenario_weather(
 	stage_number: int
 ) -> Dictionary:

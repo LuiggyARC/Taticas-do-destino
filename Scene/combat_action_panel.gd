@@ -4,6 +4,8 @@ var panel: PanelContainer
 var combat_info_label: Label
 
 var class_skill_button: Button
+var hide_button: Button
+var rage_button: Button
 var items_button: Button
 var magic_button: Button
 var end_turn_button: Button
@@ -48,6 +50,8 @@ func setup(
 	secondary_menu = null
 	combat_info_label = null
 	class_skill_button = null
+	hide_button = null
+	rage_button = null
 	items_button = null
 	magic_button = null
 	end_turn_button = null
@@ -75,6 +79,16 @@ func get_action_button_colors(
 					0.34,
 					1.0
 				)
+			}
+		"HideButton":
+			return {
+				"background": Color(0.10, 0.18, 0.19, 0.96),
+				"border": Color(0.36, 0.72, 0.73)
+			}
+		"RageButton":
+			return {
+				"background": Color(0.30, 0.09, 0.07, 0.96),
+				"border": Color(0.90, 0.35, 0.20)
 			}
 		
 		"MagicButton":
@@ -315,6 +329,22 @@ func create_panel() -> void:
 			"class_skill"
 		)
 	)
+	hide_button = create_button(
+		buttons_row,
+		"HideButton",
+		"Esconder-se",
+		130,
+		get_button_callback("hide")
+	)
+	hide_button.visible = false
+	rage_button = create_button(
+		buttons_row,
+		"RageButton",
+		"Fúria",
+		110,
+		get_button_callback("rage")
+	)
+	rage_button.visible = false
 
 	items_button = create_button(
 		buttons_row,
@@ -718,6 +748,18 @@ func configure_class_skill_button(
 	class_skill_button.visible = should_be_visible
 	class_skill_button.disabled = should_be_disabled
 	class_skill_button.text = button_text
+
+func configure_hide_button(should_be_visible: bool, should_be_disabled: bool) -> void:
+	if not is_instance_valid(hide_button):
+		return
+	hide_button.visible = should_be_visible
+	hide_button.disabled = should_be_disabled
+
+func configure_rage_button(should_be_visible: bool, should_be_disabled: bool) -> void:
+	if not is_instance_valid(rage_button):
+		return
+	rage_button.visible = should_be_visible
+	rage_button.disabled = should_be_disabled
 
 func configure_magic_button(
 	should_be_visible: bool,
