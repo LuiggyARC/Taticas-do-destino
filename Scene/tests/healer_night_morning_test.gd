@@ -21,6 +21,10 @@ func _ready() -> void:
 	assert(VillageScript.is_location_open_in_morning("shop"))
 	for closed_location in ["tavern", "town_hall", "carpenter", "healer"]:
 		assert(not VillageScript.is_location_open_in_morning(closed_location))
+		assert(not VillageScript.is_location_available(closed_location, true, false, true))
+	for location_id in ["central_square", "shop", "tavern", "town_hall", "carpenter", "healer"]:
+		assert(VillageScript.is_location_available(location_id, true, true, true))
+	assert(not VillageScript.is_location_available("unknown", true, true, true))
 	print("Healer night and morning access tests passed")
 	get_tree().quit(0)
 

@@ -329,6 +329,8 @@ func _ready() -> void:
 	create_location_view()
 	create_village_story_event()
 	refresh_village_access()
+	if has_returned_from_temple() and is_instance_valid(status_label):
+		status_label.text = "A vila está acessível. Casa de cura, loja e taverna funcionam; o prefeito e Jhon estão fora."
 	
 	resized.connect(
 		update_location_button_positions
@@ -511,6 +513,9 @@ func create_location_buttons() -> void:
 func is_next_morning() -> bool:
 	return SaveManager.has_completed_story_event(HEALER_NIGHT_EVENT_ID)
 
+func has_returned_from_temple() -> bool:
+	return MissionManager.is_mission_completed("temple_return_to_village")
+
 func has_started_temple_journey() -> bool:
 	return (
 		SaveManager.has_completed_story_event(TEMPLE_DEPARTURE_EVENT_ID)
@@ -525,15 +530,33 @@ func should_start_healer_night() -> bool:
 static func is_location_open_in_morning(location_id: String) -> bool:
 	return location_id in MORNING_OPEN_LOCATIONS
 
+static func is_location_available(
+	location_id: String,
+	morning: bool,
+	returned_from_temple: bool,
+	bridge_return_completed: bool
+) -> bool:
+	if returned_from_temple:
+		return LOCATION_AREAS.has(location_id)
+	if morning and not is_location_open_in_morning(location_id):
+		return false
+	return not (location_id == "carpenter" and bridge_return_completed)
+
 func refresh_village_access() -> void:
 	var morning: bool = is_next_morning()
 	var departed: bool = has_started_temple_journey()
+	var returned_from_temple: bool = has_returned_from_temple()
+	var bridge_return_completed: bool = (
+		SaveManager.has_completed_story_event(BRIDGE_RETURN_EVENT_ID)
+	)
 	for location_id in location_buttons.keys():
 		var button: Button = location_buttons.get(location_id) as Button
 		if not is_instance_valid(button):
 			continue
-		var closed_for_morning: bool = morning and not is_location_open_in_morning(str(location_id))
-		button.disabled = closed_for_morning or (location_id == "carpenter" and SaveManager.has_completed_story_event(BRIDGE_RETURN_EVENT_ID))
+		var closed_for_morning: bool = morning and not returned_from_temple and not is_location_open_in_morning(str(location_id))
+		button.disabled = not is_location_available(
+			str(location_id), morning, returned_from_temple, bridge_return_completed
+		)
 		button.tooltip_text = "Indisponível nesta manhã" if closed_for_morning else ("Carpintaria fechada" if button.disabled else str(LOCATION_NAMES.get(location_id, location_id)))
 	if is_instance_valid(temple_button):
 		temple_button.visible = morning and not departed
@@ -1049,9 +1072,13 @@ func on_location_pressed(
 ) -> void:
 	if bridge_return_running or kasum_event_running or healer_night_running or temple_departure_running:
 		return
-	if is_next_morning() and not is_location_open_in_morning(location_id):
-		return
-	if location_id == "carpenter" and SaveManager.has_completed_story_event(BRIDGE_RETURN_EVENT_ID):
+	var returned_from_temple: bool = has_returned_from_temple()
+	if not is_location_available(
+		location_id,
+		is_next_morning(),
+		returned_from_temple,
+		SaveManager.has_completed_story_event(BRIDGE_RETURN_EVENT_ID)
+	):
 		return
 	var location_name: String = str(
 		LOCATION_NAMES.get(
@@ -1112,6 +1139,12 @@ func on_location_pressed(
 			)
 		
 		"town_hall":
+			if returned_from_temple:
+				await show_absent_resident_message(
+					"town_hall",
+					"O prefeito está fora. A prefeitura pode ser visitada, mas não há atendimento no momento."
+				)
+				return
 			if MissionManager.is_mission_completed("emerald_bridge"):
 				if not SaveManager.has_completed_story_event(BRIDGE_RETURN_EVENT_ID):
 					bridge_return_running = true
@@ -1167,6 +1200,12 @@ func on_location_pressed(
 			await start_emerald_bridge_battle()
 		
 		"carpenter":
+			if returned_from_temple:
+				await show_absent_resident_message(
+					"carpenter",
+					"Jhon está fora. A carpintaria pode ser visitada, mas ele não está aqui para atender."
+				)
+				return
 			if MissionManager.is_mission_active(
 				"aniri_second_chance"
 			):
@@ -1367,6 +1406,16 @@ func open_location_background(
 		location_texture,
 		location_name
 	)
+
+func show_absent_resident_message(event_id: String, message: String) -> void:
+	if not is_instance_valid(story_event_controller):
+		create_village_story_event()
+	if not is_instance_valid(story_event_controller):
+		return
+	story_event_controller.move_to_front()
+	await story_event_controller.start_event(event_id + "_resident_absent", [
+		{"type": "action", "text": message}
+	])
 func run_second_chance_village_decision() -> bool:
 	const MISSION_ID: String = "aniri_second_chance"
 	const DECISION_EVENT_ID: String = (
@@ -1540,7 +1589,9 @@ func run_second_chance_village_decision() -> bool:
 	return true
 func on_return_to_village_requested() -> void:
 	if is_instance_valid(status_label):
-		if is_next_morning() and has_started_temple_journey():
+		if has_returned_from_temple():
+			status_label.text = "Todas as casas estão acessíveis. A casa de cura, a loja e a taverna estão funcionando; o prefeito e Jhon estão fora."
+		elif is_next_morning() and has_started_temple_journey():
 			status_label.text = "A praça e a loja estão abertas. Escolha o próximo destino no mapa do mundo."
 		elif is_next_morning():
 			status_label.text = "Amanheceu. A praça, a loja e o caminho para o templo estão disponíveis."
