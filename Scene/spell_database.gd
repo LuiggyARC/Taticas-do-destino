@@ -337,6 +337,58 @@ var spells := {
 		"flat_bonus": 2
 	},
 
+	"Chuva de Brasas": {
+		"level": 2,
+		"classes": ["Feiticeiro"],
+		"description": "Fagulhas caem sobre uma pequena área e causam 3d4 de dano de fogo.",
+		"visual_kind": "fire",
+		"effect": "damage",
+		"spell_type": "damage",
+		"type": "damage",
+		"target": "enemy",
+		"is_area": true,
+		"range_meters": 9.0,
+		"area_radius": 1,
+		"value_dice": 4,
+		"value_dice_count": 3,
+		"flat_bonus": 0
+	},
+
+	"Manto de Fagulhas": {
+		"level": 2,
+		"classes": ["Feiticeiro"],
+		"description": "Uma barreira de fagulhas protege o conjurador e concede +3 de CA por 4 turnos.",
+		"visual_kind": "fire",
+		"effect": "buff",
+		"spell_type": "buff",
+		"type": "buff",
+		"target": "self",
+		"range_meters": 0.0,
+		"area_radius": 0,
+		"attack_bonus": 0,
+		"damage_bonus": 0,
+		"armor_bonus": 3,
+		"movement_bonus": 0.0,
+		"duration": 4
+	},
+
+	"Eco Desconcertante": {
+		"level": 2,
+		"classes": ["Bardo"],
+		"description": "Um acorde dissonante reduz em 2 o ataque e a CA e em 3 m o movimento de inimigos em uma pequena área por 2 turnos.",
+		"effect": "control",
+		"spell_type": "control",
+		"type": "control",
+		"target": "enemy",
+		"is_area": true,
+		"range_meters": 9.0,
+		"area_radius": 1,
+		"attack_penalty": 2,
+		"armor_penalty": 2,
+		"movement_penalty": 3.0,
+		"duration": 2
+	},
+
 	"Benção Maior": {
 		"level": 1,
 		"classes": ["Clérigo"],

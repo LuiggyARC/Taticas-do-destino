@@ -89,6 +89,18 @@ func get_level_up_preview(
 		spell_choice_count,
 		available_spells.size()
 	)
+	var required_spell_level: int = -1
+	if spell_choice_count > 0 and int(new_spell_slots.get(2, 0)) > 0:
+		var knows_circle_2: bool = false
+		for known_name in hero_unit.known_spells:
+			if int(SpellDatabase.get_spell_data(str(known_name)).get("level", -1)) == 2:
+				knows_circle_2 = true
+				break
+		if not knows_circle_2:
+			for available_name in available_spells:
+				if int(SpellDatabase.get_spell_data(available_name).get("level", -1)) == 2:
+					required_spell_level = 2
+					break
 	
 	var preview: Dictionary = {
 		"current_level": current_level,
@@ -169,6 +181,7 @@ func get_level_up_preview(
 			)
 		),
 		"spell_choice_count": spell_choice_count,
+		"required_spell_level": required_spell_level,
 		"available_spells": available_spells,
 		"current_spell_slots": current_spell_slots,
 		"new_spell_slots": new_spell_slots,
@@ -479,8 +492,16 @@ func get_available_spell_names(
 		
 		result.append(spell_name)
 	
-	result.sort()
+	result.sort_custom(Callable(self, "_sort_spells_by_circle"))
 	return result
+
+
+func _sort_spells_by_circle(left: String, right: String) -> bool:
+	var left_level: int = int(SpellDatabase.get_spell_data(left).get("level", 0))
+	var right_level: int = int(SpellDatabase.get_spell_data(right).get("level", 0))
+	if left_level != right_level:
+		return left_level > right_level
+	return left < right
 
 
 func get_max_spell_level_for_class(

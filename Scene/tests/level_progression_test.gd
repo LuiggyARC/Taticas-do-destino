@@ -77,6 +77,37 @@ func _ready() -> void:
 	assert(int(wizard_level_3["new_spell_slots"][2]) > 0)
 	assert(wizard_level_3["available_spells"].has("Estilhaços Arcanos"))
 	assert(wizard_level_3["available_spells"].has("Barreira de Runas"))
+	assert(int(wizard_level_3["required_spell_level"]) == 2)
+	var bard: Node2D = HeroScript.new()
+	bard.character_class = "Bardo"
+	bard.level = 3
+	var bard_level_4: Dictionary = level_manager.get_level_up_preview(bard, 4)
+	assert(int(bard_level_4["new_spell_slots"][2]) > 0)
+	assert(int(bard_level_4["required_spell_level"]) == 2)
+	assert(bard_level_4["available_spells"].has("Eco Desconcertante"))
+	bard.free()
+	var sorcerer: Node2D = HeroScript.new()
+	sorcerer.character_class = "Feiticeiro"
+	sorcerer.level = 4
+	var sorcerer_level_5: Dictionary = level_manager.get_level_up_preview(sorcerer, 5)
+	assert(int(sorcerer_level_5["spell_choice_count"]) == 1)
+	assert(int(sorcerer_level_5["required_spell_level"]) == 2)
+	assert(int(sorcerer_level_5["new_spell_slots"][2]) > 0)
+	assert(sorcerer_level_5["available_spells"].has("Chuva de Brasas"))
+	assert(sorcerer_level_5["available_spells"].has("Manto de Fagulhas"))
+	assert(int(SpellDatabase.get_spell_data(str(sorcerer_level_5["available_spells"][0])).get("level", 0)) == 2)
+	sorcerer.known_spells = ["Explosão de Brasas"]
+	sorcerer.max_spell_slots_level_2 = 1
+	assert(sorcerer.apply_level_up_result({
+		"new_level": 5,
+		"hp_gain": 5,
+		"attribute_increases": {},
+		"selected_spells": ["Chuva de Brasas"],
+		"new_spell_slots": sorcerer_level_5["new_spell_slots"]
+	}))
+	assert(sorcerer.known_spells.has("Chuva de Brasas"))
+	assert(sorcerer.max_spell_slots_level_2 > 0)
+	sorcerer.free()
 	var level_panel: LevelUpPanel = LevelUpPanelScript.new()
 	add_child(level_panel)
 	level_panel.open_for_hero(wizard, 2)

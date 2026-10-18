@@ -688,6 +688,8 @@ func create_progression_section() -> void:
 				)
 			)
 		)
+	if int(level_up_preview.get("required_spell_level", -1)) == 2 and int(current_slots.get(2, 0)) > 0:
+		progression_lines.append("Círculo 2 já desbloqueado: %d espaço(s); escolha uma magia para usá-lo após descansar." % int(new_slots.get(2, 0)))
 	
 	if progression_lines.is_empty():
 		progression_label.text = (
@@ -982,6 +984,8 @@ func create_spell_section() -> void:
 		)
 		+ " Toque em uma magia para ver seu efeito."
 	)
+	if int(level_up_preview.get("required_spell_level", -1)) == 2:
+		spell_instruction_label.text += " Escolha pelo menos uma do círculo 2, agora disponível para sua classe."
 	spell_instruction_label.add_theme_font_size_override(
 		"font_size",
 		16
@@ -1268,6 +1272,16 @@ func on_confirm_button_pressed() -> void:
 			)
 		)
 		return
+	var required_spell_level: int = int(level_up_preview.get("required_spell_level", -1))
+	if required_spell_level >= 0:
+		var selected_required_level: bool = false
+		for spell_name in selected_spells:
+			if int(SpellDatabase.get_spell_data(spell_name).get("level", -1)) == required_spell_level:
+				selected_required_level = true
+				break
+		if not selected_required_level:
+			validation_label.text = "Escolha pelo menos uma magia do círculo %d." % required_spell_level
+			return
 	
 	var result: Dictionary = {
 		"current_level": int(
