@@ -42,6 +42,9 @@ func _ready() -> void:
 	combat.hero = hero
 	combat.current_active_unit = hero
 	assert(combat.can_select_druid_power(hero, "druid_barkguard"))
+	hero.has_attacked = true
+	assert(combat.can_select_druid_power(hero, "druid_barkguard"))
+	hero.has_attacked = false
 	assert(combat.get_druid_circle_healing(hero) == 10)
 	combat.free()
 	hero.free()

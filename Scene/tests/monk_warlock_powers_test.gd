@@ -36,6 +36,10 @@ func _ready() -> void:
 	assert(combat.can_select_monk_power(monk, "monk_flurry"))
 	monk.encounter_powers_used.append("monk_flurry")
 	assert(not combat.can_select_monk_power(monk, "monk_flurry"))
+	assert(str(MonkPowers.get_powers_for_level(9)[1]["frequency"]) == "Por encontro")
+	monk.level = 10
+	assert(str(MonkPowers.get_powers_for_level(10)[1]["frequency"]) == "Sem limite")
+	assert(combat.can_select_monk_power(monk, "monk_flurry"))
 	combat.free()
 	monk.free()
 	var warlock: Node2D = HeroScript.new()

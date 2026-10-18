@@ -1,4 +1,5 @@
 extends Node2D
+const BattleTokenVisual = preload("res://Scene/battle_unit_token.gd")
 
 const TILE_SIZE := 64
 var grid_position: Vector2i = Vector2i(10, 7)
@@ -9,6 +10,14 @@ var health_name_label: Label
 var status_effects: Dictionary = {}
 var monster_id: String = ""
 var display_name: String = "Inimigo"
+var level: int = 1
+var feats: Array = []
+var spell_slots_by_level: Dictionary = {}
+var spell_save_dc_base: int = 10
+var illusion_dc_bonus: int = 0
+var spell_damage_bonus: int = 0
+var spell_range_bonus: float = 0.0
+var illusion_save_bonus: int = 0
 
 var creature_type: String = ""
 var subtype: String = ""
@@ -35,6 +44,9 @@ var weapon_type: String = "melee"
 var damage_dice: int = 3
 var damage_dice_count: int = 1
 var damage_bonus: int = 0
+var weapon_attack_bonus: int = 0
+var iterative_attack_penalty: int = 0
+var critical_threshold: int = 20
 var weapon_range_meters: float = 1.5
 
 var equipped_armor: String = "Nenhuma"
@@ -101,7 +113,12 @@ var paralysis_immunity_races: Array = []
 
 var trip_bonus: int = 0
 
-var has_attacked: bool = false
+var attacks_used_this_turn: int = 0
+var has_attacked: bool:
+	get:
+		return attacks_used_this_turn >= get_max_attack_actions()
+	set(value):
+		attacks_used_this_turn = mini(attacks_used_this_turn + 1, get_max_attack_actions()) if value else 0
 var has_opportunity_attacked: bool = false
 
 var attack_power: int = 10
@@ -122,14 +139,10 @@ func _ready():
 	update_world_position()
 
 func create_visual():
-	var body := ColorRect.new()
-	body.name = "Body"
-	body.size = Vector2(48, 48)
-	body.position = Vector2(-24, -24)
-	body.color = Color(1.0, 0.1, 0.1)
-	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	
-	add_child(body)
+	var token: Node2D = BattleTokenVisual.new()
+	token.name = "BattleToken"
+	add_child(token)
+	token.configure("", "enemy", monster_id)
 	
 	create_health_display()
 
@@ -150,6 +163,14 @@ func reset_movement() -> void:
 	
 	has_attacked = false
 	has_opportunity_attacked = false
+
+
+func get_max_attack_actions() -> int:
+	return 1 + int(level >= 5) + int(level >= 10)
+
+
+func get_remaining_attack_actions() -> int:
+	return maxi(0, get_max_attack_actions() - attacks_used_this_turn)
 	
 func take_damage(amount: int):
 	if hp <= 0:
@@ -225,6 +246,7 @@ func get_equipped_weapon_data() -> Dictionary:
 		"damage_dice": damage_dice,
 		"damage_dice_count": damage_dice_count,
 		"damage_bonus": damage_bonus,
+		"attack_bonus": weapon_attack_bonus,
 		"range_meters": weapon_range_meters
 	}
 
@@ -291,6 +313,14 @@ func setup_from_monster_data(
 	if monster_data.is_empty():
 		print("Ficha de monstro vazia.")
 		return
+	level = maxi(1, int(monster_data.get("level", 1)))
+	feats = monster_data.get("feats", []).duplicate(true)
+	spell_slots_by_level = monster_data.get("spell_slots", {}).duplicate(true)
+	spell_save_dc_base = int(monster_data.get("spell_save_dc_base", 10))
+	illusion_dc_bonus = int(monster_data.get("illusion_dc_bonus", 0))
+	spell_damage_bonus = int(monster_data.get("spell_damage_bonus", 0))
+	spell_range_bonus = float(monster_data.get("spell_range_bonus", 0.0))
+	illusion_save_bonus = int(monster_data.get("illusion_save_bonus", 0))
 	
 	monster_id = str(
 		monster_data.get(
@@ -421,6 +451,16 @@ func setup_from_monster_data(
 			0
 		)
 	)
+	weapon_attack_bonus = int(monster_data.get("weapon_attack_bonus", 0))
+	iterative_attack_penalty = int(monster_data.get("iterative_attack_penalty", 0))
+	critical_threshold = int(monster_data.get("critical_threshold", 20))
+	var portrait_id: String = str(monster_data.get("id", monster_id))
+	var portrait_path: String = str(monster_data.get("portrait_path", ""))
+	if portrait_path.is_empty():
+		portrait_path = BattleTokenVisual.enemy_portrait_path(portrait_id)
+	var token: Node2D = get_node_or_null("BattleToken")
+	if is_instance_valid(token):
+		token.configure(portrait_path, "enemy", portrait_id)
 	
 	weapon_range_meters = float(
 		monster_data.get(
@@ -621,7 +661,7 @@ func setup_from_monster_data(
 	max_spell_slots_level_1 = int(
 		monster_data.get(
 			"max_spell_slots_level_1",
-			0
+			spell_slots_by_level.get(1, 0)
 		)
 	)
 	
@@ -763,6 +803,8 @@ func has_spell_slot_available(
 ) -> bool:
 	if not can_cast_spells:
 		return false
+	if spell_slots_by_level.has(spell_level):
+		return int(spell_slots_by_level[spell_level]) > 0
 	
 	match spell_level:
 		1:
@@ -781,6 +823,11 @@ func consume_spell_slot(
 		spell_level
 	):
 		return false
+	if spell_slots_by_level.has(spell_level):
+		spell_slots_by_level[spell_level] = maxi(0, int(spell_slots_by_level[spell_level]) - 1)
+		if spell_level == 1:
+			spell_slots_level_1 = int(spell_slots_by_level[spell_level])
+		return true
 	
 	match spell_level:
 		1:

@@ -21,7 +21,7 @@ func _ready() -> void:
 	bridge_completed = MissionManager.is_mission_completed(MapRules.BRIDGE_MISSION_ID)
 	road_story_completed = SaveManager.has_completed_story_event(MapRules.ROAD_EVENT_ID)
 	var save_data: Dictionary = SaveManager.read_save_data(SaveManager.get_active_save_path())
-	var default_node: String = "citadel" if GameState.current_location == "citadel" else ("bridge" if GameState.current_location == "temple_road" else "village")
+	var default_node: String = "citadel" if GameState.current_location in ["citadel", "temple_gate", "temple_hall"] else ("bridge" if GameState.current_location == "temple_road" else "village")
 	current_node = str(save_data.get("world_map_node", default_node))
 	if not MapRules.NODES.has(current_node) or not MapRules.is_unlocked(current_node, bridge_completed, road_story_completed):
 		current_node = default_node if MapRules.is_unlocked(default_node, bridge_completed, road_story_completed) else "village"

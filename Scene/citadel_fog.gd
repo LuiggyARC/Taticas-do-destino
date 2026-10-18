@@ -20,9 +20,9 @@ func _draw() -> void:
 			var cell := Vector2i(x, y)
 			var rect := Rect2(Vector2(cell * Rules.TILE_SIZE), Vector2.ONE * Rules.TILE_SIZE)
 			if not visible_cells.has(cell):
-				draw_rect(rect, Color(0.0, 0.01, 0.02, 0.81 if explored_cells.has(cell) else 0.985))
+				draw_rect(rect, Color(0.0, 0.01, 0.02, 0.74 if explored_cells.has(cell) else 0.985))
 			else:
-				draw_rect(rect, Color(0.0, 0.01, 0.02, 0.22))
+				draw_rect(rect, Color(0.0, 0.01, 0.02, 0.10))
 				if danger_cells.has(cell):
 					draw_rect(rect, Color(0.93, 0.12, 0.08, 0.38))
 					for edge in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:

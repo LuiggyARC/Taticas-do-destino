@@ -1,8 +1,10 @@
 extends Node2D
+const BattleTokenVisual = preload("res://Scene/battle_unit_token.gd")
 signal died(npc_unit: Node2D)
 
 var npc_visual_body: CanvasItem
 var npc_visual_border: CanvasItem
+var battle_portrait_path: String = ""
 var death_emitted: bool = false
 var race: String = ""
 var unstoppable_active: bool = false
@@ -68,7 +70,12 @@ var weapon_range_meters: float = 1.5
 
 var ai_behavior: String = "defensive"
 
-var has_attacked: bool = false
+var attacks_used_this_turn: int = 0
+var has_attacked: bool:
+	get:
+		return attacks_used_this_turn >= get_max_attack_actions()
+	set(value):
+		attacks_used_this_turn = mini(attacks_used_this_turn + 1, get_max_attack_actions()) if value else 0
 var has_opportunity_attacked: bool = false
 var is_hidden: bool = false
 var hide_used_this_turn: bool = false
@@ -113,38 +120,18 @@ func play_attack_animation(_target_position: Vector2) -> void:
 
 func create_visual() -> void:
 	for child in get_children():
+		remove_child(child)
 		child.queue_free()
 	npc_visual_body = null
 	npc_visual_border = null
-
-	var body_color: Color
-	var border_color: Color
-
-	if control_type == "player":
-		body_color = Color(0.10, 0.38, 0.95, 1.0)
-		border_color = Color(0.35, 0.70, 1.0, 0.55)
-	else:
-		body_color = Color(0.10, 0.72, 0.28, 1.0)
-		border_color = Color(0.45, 1.0, 0.45, 0.55)
-
-	var border: ColorRect = ColorRect.new()
-	border.name = "NpcBorder"
-	border.size = Vector2(50, 50)
-	border.position = Vector2(-25, -25)
-	border.color = border_color
-	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	border.z_index = -1
-	add_child(border)
-	npc_visual_border = border
-
-	var body: ColorRect = ColorRect.new()
-	body.name = "NpcBody"
-	body.size = Vector2(42, 42)
-	body.position = Vector2(-21, -21)
-	body.color = body_color
-	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(body)
-	npc_visual_body = body
+	var token: Node2D = BattleTokenVisual.new()
+	token.name = "BattleToken"
+	add_child(token)
+	var portrait_path: String = battle_portrait_path
+	if portrait_path.is_empty():
+		portrait_path = BattleTokenVisual.npc_portrait_path(npc_id)
+	token.configure(portrait_path, "ally" if control_type == "player" else "ai_ally", npc_id)
+	npc_visual_body = token
 
 	create_health_bar()
 	update_hidden_visual()
@@ -169,6 +156,7 @@ func set_hidden_state(hidden: bool) -> void:
 func setup_from_npc_data(
 	npc_data: Dictionary
 ) -> void:
+	battle_portrait_path = str(npc_data.get("portrait_path", ""))
 	npc_id = str(
 		npc_data.get(
 			"id",
@@ -561,6 +549,14 @@ func reset_movement():
 	has_opportunity_attacked = false
 	hide_used_this_turn = false
 	smite_evil_active = false
+
+
+func get_max_attack_actions() -> int:
+	return 1 + int(level >= 5) + int(level >= 10)
+
+
+func get_remaining_attack_actions() -> int:
+	return maxi(0, get_max_attack_actions() - attacks_used_this_turn)
 
 
 func can_use_hide_skill() -> bool:

@@ -1,12 +1,17 @@
 extends Node2D
 
 const Rules = preload("res://Scene/citadel_stealth_rules.gd")
+const CitadelStory = preload("res://Scene/citadel_story_database.gd")
 const FogScript = preload("res://Scene/citadel_fog.gd")
+const MovementOverlayScript = preload("res://Scene/citadel_movement_overlay.gd")
 const NpcDatabase = preload("res://Scene/npc_database.gd")
 const WORLD_MAP_SCENE := "res://Scene/world_map.tscn"
+const TEMPLE_HALL_SCENE := "res://Scene/temple_hall.tscn"
 const STEALTH_MUSIC_PATH := "res://Assets/Audio/Temafurtivo.mp3"
 const ANIRI_PORTRAIT := "res://Assets/Characters/AniriLadina.png"
 const CULTIST_PORTRAIT := "res://Assets/Characters/Cultista1.png"
+const GLASS_SOUND_PATH := "res://Assets/Audio/SFX/Caco de vidro.mp3"
+const GLASS_WARNING := "Droga, lugar imundo! Tem cacos no chão. Devo tomar cuidado para não chamar atenção. Agora deve ter alguém vindo ver."
 
 var player_cell: Vector2i = Rules.START
 var movement_left: int = Rules.PLAYER_MOVE_TILES
@@ -17,7 +22,9 @@ var completed: bool = false
 var is_stealthed: bool = false
 var bedroom_clue_found: bool = false
 var strategy_clue_found: bool = false
+var escape_phase: bool = false
 var chest_claimed: bool = false
+var chest_reward_paid: bool = false
 var pending_noise: Vector2i = Vector2i(-1, -1)
 var guards: Array[Dictionary] = []
 var visible_cells: Dictionary = {}
@@ -28,6 +35,8 @@ var last_perception_feedback: String = ""
 
 var camera: Camera2D
 var fog: Node2D
+var movement_overlay: Node2D
+var glass_sound: AudioStreamPlayer
 var player_token: Panel
 var guard_tokens: Array[Panel] = []
 var clue_markers: Dictionary = {}
@@ -38,6 +47,8 @@ var hide_button: Button
 var end_turn_button: Button
 var retry_button: Button
 var leave_button: Button
+var dialogue_box: StoryDialogBox
+var capture_dialog: ConfirmationDialog
 
 
 func _ready() -> void:
@@ -47,6 +58,18 @@ func _ready() -> void:
 		push_error(problem)
 	_build_world()
 	_build_interface()
+	dialogue_box = StoryDialogBox.new()
+	dialogue_box.name = "CitadelStoryDialogue"
+	add_child(dialogue_box)
+	capture_dialog = ConfirmationDialog.new()
+	capture_dialog.name = "AniriCapturada"
+	capture_dialog.title = "Aniri foi capturada"
+	capture_dialog.dialog_text = "Os cultistas viram Aniri. Ela foi capturada e morta.\nDeseja tentar novamente?"
+	capture_dialog.ok_button_text = "Tentar novamente"
+	capture_dialog.cancel_button_text = "Voltar ao mapa"
+	capture_dialog.confirmed.connect(_on_retry_pressed)
+	capture_dialog.canceled.connect(_on_leave_pressed)
+	add_child(capture_dialog)
 	_load_progress()
 	_create_guards()
 	_refresh_vision()
@@ -56,6 +79,22 @@ func _ready() -> void:
 		completed = true
 		_set_status("A infiltração já foi concluída. Você pode voltar ao mapa.")
 		_refresh_interface()
+	else:
+		moving = true
+		_refresh_interface()
+		call_deferred("_play_arrival")
+
+
+func _play_arrival() -> void:
+	await _play_story_sequence(CitadelStory.get_arrival())
+	moving = false
+	_set_status("Explore a cidadela sem ser vista. Encontre primeiro o relatório no quarto com cama e mesa.")
+	_refresh_interface()
+
+
+func _play_story_sequence(steps: Array[Dictionary]) -> void:
+	for step in steps:
+		await dialogue_box.show_dialog(str(step["speaker"]), str(step["text"]))
 
 
 func _start_stealth_music() -> void:
@@ -75,12 +114,15 @@ func _build_world() -> void:
 	fog = FogScript.new()
 	fog.name = "NevoaDeGuerra"
 	add_child(fog)
-	for clue_id in ["bedroom", "strategy", "chest"]:
+	movement_overlay = MovementOverlayScript.new()
+	movement_overlay.name = "CasasDeMovimento"
+	add_child(movement_overlay)
+	for clue_id in ["bedroom", "strategy", "exit"]:
 		var marker: Label = Label.new()
 		marker.name = "Marker_" + clue_id
-		marker.text = "◆" if clue_id != "chest" else "★"
+		marker.text = "↩" if clue_id == "exit" else "◆"
 		marker.add_theme_font_size_override("font_size", 32)
-		marker.add_theme_color_override("font_color", Color(1.0, 0.88, 0.32))
+		marker.add_theme_color_override("font_color", Color(0.45, 1.0, 0.67) if clue_id == "exit" else Color(1.0, 0.88, 0.32))
 		marker.add_theme_color_override("font_shadow_color", Color.BLACK)
 		marker.add_theme_constant_override("shadow_offset_x", 2)
 		marker.add_theme_constant_override("shadow_offset_y", 2)
@@ -89,6 +131,11 @@ func _build_world() -> void:
 		marker.position = Rules.cell_center(cell) - Vector2(14, 23)
 		add_child(marker)
 		clue_markers[clue_id] = marker
+	glass_sound = AudioStreamPlayer.new()
+	glass_sound.name = "CacosDeVidro"
+	glass_sound.stream = load(GLASS_SOUND_PATH) as AudioStream
+	glass_sound.volume_db = -3.0
+	add_child(glass_sound)
 	player_token = _make_token("Aniri", Color(0.10, 0.52, 0.74), ANIRI_PORTRAIT)
 	player_token.position = Rules.cell_center(player_cell) - Vector2(24, 24)
 	add_child(player_token)
@@ -277,10 +324,10 @@ func _move_player_to(target: Vector2i) -> void:
 		camera.position = Rules.cell_center(player_cell)
 		_refresh_vision()
 		if step in Rules.GLASS and step != previous:
-			_queue_noise(step)
+			await _queue_noise(step)
 		if _check_detection():
 			break
-		if _collect_nearby():
+		if await _collect_nearby():
 			break
 	moving = false
 	_refresh_interface()
@@ -295,7 +342,14 @@ func _animate_token(token: Panel, cell: Vector2i) -> void:
 func _queue_noise(cell: Vector2i) -> void:
 	if pending_noise.x < 0:
 		pending_noise = cell
+	if is_instance_valid(glass_sound) and glass_sound.stream != null:
+		glass_sound.stop()
+		glass_sound.play()
+		var sound_length: float = glass_sound.stream.get_length()
+		if sound_length > 0.0:
+			await get_tree().create_timer(sound_length, false).timeout
 	_set_status("Cacos de vidro! O cultista mais próximo investigará o barulho no próximo turno.")
+	await dialogue_box.show_dialog("Aniri", GLASS_WARNING)
 
 
 func _on_hide_pressed() -> void:
@@ -332,24 +386,47 @@ func _on_end_turn_pressed() -> void:
 		movement_left = Rules.PLAYER_MOVE_TILES
 		moving = false
 		_refresh_vision()
-		_set_status(last_perception_feedback if not last_perception_feedback.is_empty() else "Sua vez. Observe os cultistas e avance até as informações.")
+		var turn_hint: String = "Sua vez. Volte ao túnel de entrada sem ser vista." if escape_phase else "Sua vez. Observe os cultistas e avance até as informações."
+		_set_status(last_perception_feedback if not last_perception_feedback.is_empty() else turn_hint)
 	_refresh_interface()
 
 
 func _assign_noise_investigation(cell: Vector2i) -> void:
 	var nearest_index: int = -1
 	var best_distance: int = 1000000
+	var best_target: Vector2i = cell
 	for index in range(guards.size()):
-		var route: Array[Vector2i] = Rules.path(guards[index]["cell"], Rules.nearest_walkable(cell))
-		if route.is_empty():
+		var candidate: Dictionary = _noise_destination(index, cell)
+		if candidate.is_empty():
 			continue
-		if route.size() < best_distance:
-			best_distance = route.size()
+		if int(candidate["steps"]) < best_distance:
+			best_distance = int(candidate["steps"])
 			nearest_index = index
+			best_target = candidate["cell"]
 	if nearest_index >= 0:
 		guards[nearest_index]["investigating"] = true
-		guards[nearest_index]["noise_target"] = Rules.nearest_walkable(cell)
+		guards[nearest_index]["noise_target"] = best_target
 		_set_status("%s ouviu o vidro e vai verificar o local." % guards[nearest_index]["name"])
+	else:
+		_set_status("O barulho ecoou, mas nenhum cultista alcança esse corredor.")
+
+
+func _noise_destination(index: int, noise_cell: Vector2i) -> Dictionary:
+	var occupied: Array[Vector2i] = [player_cell]
+	for other_index in range(guards.size()):
+		if other_index != index:
+			occupied.append(guards[other_index]["cell"])
+	var best: Dictionary = {}
+	for offset in [Vector2i.ZERO, Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+		var candidate: Vector2i = noise_cell + offset
+		if Rules.blocked(candidate) or candidate in occupied:
+			continue
+		var route: Array[Vector2i] = Rules.path(guards[index]["cell"], candidate, occupied)
+		if route.is_empty() and guards[index]["cell"] != candidate:
+			continue
+		if best.is_empty() or route.size() < int(best["steps"]):
+			best = {"cell": candidate, "steps": route.size()}
+	return best
 
 
 func _take_guard_turn(index: int) -> void:
@@ -366,7 +443,13 @@ func _take_guard_turn(index: int) -> void:
 	var route: Array[Vector2i] = Rules.path(guard["cell"], target, occupied)
 	if _check_guard_detection(index):
 		return
-	for step_index in range(mini(route.size(), Rules.GUARD_MOVE_TILES)):
+	if guard["investigating"] and route.is_empty() and guard["cell"] != target:
+		var alternate: Dictionary = _noise_destination(index, target)
+		if not alternate.is_empty():
+			target = alternate["cell"]
+			guard["noise_target"] = target
+			route = Rules.path(guard["cell"], target, occupied)
+	for step_index in range(mini(route.size(), Rules.GUARD_MOVE_TILES + (1 if escape_phase else 0))):
 		var step: Vector2i = route[step_index]
 		guard["facing"] = step - guard["cell"]
 		await _animate_token(guard_tokens[index], step)
@@ -425,22 +508,34 @@ func _check_detection() -> bool:
 func _fail_mission(message: String) -> void:
 	failed = true
 	moving = false
-	_set_status(message + " Toque em Tentar novamente.")
+	_set_status(message + " Aniri foi capturada e morta.")
 	_refresh_interface()
+	if is_instance_valid(capture_dialog):
+		capture_dialog.popup_centered(Vector2i(760, 260))
+
+
+func _can_interact_with_chest() -> bool:
+	return Rules.adjacent_or_same(player_cell, Rules.CHEST) and Rules.has_line_of_sight(player_cell, Rules.CHEST)
 
 
 func _collect_nearby() -> bool:
 	if not bedroom_clue_found and Rules.adjacent_or_same(player_cell, Rules.BEDROOM_CLUE) and Rules.has_line_of_sight(player_cell, Rules.BEDROOM_CLUE):
 		bedroom_clue_found = true
-		_set_status("Informação encontrada no quarto com cama e mesa. Falta a mesa com seis tocos.")
-		_save_progress()
-	if not strategy_clue_found and Rules.adjacent_or_same(player_cell, Rules.STRATEGY_CLUE) and Rules.has_line_of_sight(player_cell, Rules.STRATEGY_CLUE):
+		_refresh_interface()
+		await _play_story_sequence(CitadelStory.get_bedroom_report())
+		_set_status("Relatório de Ebramir encontrado. Procure a ordem do culto na mesa com seis tocos.")
+		return true
+	if bedroom_clue_found and not strategy_clue_found and Rules.adjacent_or_same(player_cell, Rules.STRATEGY_CLUE) and Rules.has_line_of_sight(player_cell, Rules.STRATEGY_CLUE):
 		strategy_clue_found = true
-		_set_status("Informação encontrada na mesa com seis tocos. Aniri reuniu as duas pistas.")
-		_save_progress()
-	if not chest_claimed and Rules.adjacent_or_same(player_cell, Rules.CHEST) and Rules.has_line_of_sight(player_cell, Rules.CHEST):
-		_claim_chest()
-	if bedroom_clue_found and strategy_clue_found:
+		_refresh_interface()
+		await _play_story_sequence(CitadelStory.get_strategy_report())
+		escape_phase = true
+		_set_status("O culto já marchou contra o templo! Fuja pelo túnel de entrada e avise o grupo. As patrulhas estão mais rápidas.")
+		return true
+	if not chest_claimed and _can_interact_with_chest():
+		await _claim_chest()
+		return true
+	if escape_phase and player_cell == Rules.START:
 		_complete_mission()
 		return true
 	_refresh_interface()
@@ -448,25 +543,30 @@ func _collect_nearby() -> bool:
 
 
 func _claim_chest() -> void:
-	var previous_gold: int = InventoryManager.get_gold()
-	if not InventoryManager.add_gold(50):
-		return
 	chest_claimed = true
-	if _save_progress():
-		_set_status("Aniri encontrou 50 peças de ouro no baú.")
-	else:
-		InventoryManager.set_gold(previous_gold)
-		chest_claimed = false
-		_set_status("Não foi possível salvar a recompensa do baú. Tente novamente.")
+	var reward_message: String = "Você encontrou um baú com 50 peças de ouro. Conclua a infiltração para receber a recompensa."
+	_set_status(reward_message)
+	await dialogue_box.show_dialog("Narrador", reward_message)
+	_refresh_interface()
 
 
 func _load_progress() -> void:
 	var save_data: Dictionary = SaveManager.read_save_data(SaveManager.get_active_save_path())
-	var progress: Dictionary = save_data.get("citadel_stealth", {})
-	chest_claimed = bool(progress.get("chest_claimed", false))
+	_restore_chest_state(save_data.get("citadel_stealth", {}))
 	# As pistas só valem ao concluir uma infiltração sem ser visto.
 	bedroom_clue_found = false
 	strategy_clue_found = false
+	escape_phase = false
+
+
+func _restore_chest_state(progress: Dictionary) -> void:
+	# O baú pertence à tentativa atual. Saves antigos já entregaram o ouro ao coletá-lo.
+	chest_claimed = false
+	chest_reward_paid = bool(progress.get("chest_reward_paid", progress.get("chest_claimed", false)))
+
+
+func _chest_gold_due() -> bool:
+	return chest_claimed and not chest_reward_paid
 
 
 func _save_progress() -> bool:
@@ -474,7 +574,7 @@ func _save_progress() -> bool:
 	var save_data: Dictionary = SaveManager.read_save_data(save_path)
 	if save_data.is_empty():
 		return false
-	save_data["citadel_stealth"] = {"chest_claimed": chest_claimed}
+	save_data["citadel_stealth"] = {"chest_reward_paid": chest_reward_paid}
 	save_data["inventory"] = InventoryManager.get_save_data()
 	save_data["missions"] = MissionManager.get_save_data()
 	save_data["world_map_node"] = "citadel"
@@ -487,19 +587,28 @@ func _save_progress() -> bool:
 
 func _complete_mission() -> void:
 	var old_missions: Dictionary = MissionManager.get_save_data()
+	var previous_gold: int = InventoryManager.get_gold()
+	var reward_was_paid: bool = chest_reward_paid
 	if MissionManager.is_mission_active(Rules.MISSION_ID):
 		MissionManager.update_mission_progress(Rules.MISSION_ID, "bedroom_information", true)
 		MissionManager.update_mission_progress(Rules.MISSION_ID, "strategy_information", true)
+		MissionManager.update_mission_description(Rules.MISSION_ID, "Aniri encontrou o relatório de Ebramir sobre a fenda próxima a Montirel e a ordem de atacar o templo antes do amanhecer. Ela escapou sem ser descoberta; avise o grupo.")
 		MissionManager.complete_mission(Rules.MISSION_ID)
+	var awarded_chest_gold: bool = _chest_gold_due()
+	if awarded_chest_gold:
+		InventoryManager.add_gold(50)
+		chest_reward_paid = true
 	if not _save_progress():
 		MissionManager.load_save_data(old_missions)
+		InventoryManager.set_gold(previous_gold)
+		chest_reward_paid = reward_was_paid
 		failed = true
 		_set_status("As pistas foram encontradas, mas não foi possível salvar. Tente a infiltração novamente.")
 		_refresh_interface()
 		return
 	completed = true
 	moving = false
-	_set_status("Missão concluída: Aniri reuniu as duas informações sem ser percebida. Volte ao mapa.")
+	_set_status("Missão concluída: Aniri voltou pelo túnel com as duas informações.%s Volte ao mapa para avisar o grupo." % (" Baú: +50 peças de ouro." if awarded_chest_gold else ""))
 	_refresh_interface()
 
 
@@ -522,15 +631,12 @@ func _refresh_vision() -> void:
 	for index in range(guards.size()):
 		guard_tokens[index].visible = visible_cells.has(guards[index]["cell"])
 		guard_tokens[index].modulate = Color(1.0, 0.75, 0.42) if guards[index]["investigating"] else Color.WHITE
-	for clue_id in clue_markers:
-		var cell: Vector2i = _marker_cell(clue_id)
-		var done: bool = (clue_id == "bedroom" and bedroom_clue_found) or (clue_id == "strategy" and strategy_clue_found) or (clue_id == "chest" and chest_claimed)
-		clue_markers[clue_id].visible = visible_cells.has(cell) and not done
+	_refresh_markers()
 
 
 func _guard_threatens_cell(guard: Dictionary, cell: Vector2i) -> bool:
 	var location: Vector2i = guard["cell"]
-	if not Rules.can_see(location, cell, Rules.CULTIST_VISION_METERS):
+	if not Rules.can_see(location, cell, Rules.CULTIST_VISION_METERS, true):
 		return false
 	if Rules.distance_meters(location, cell) <= Rules.METERS_PER_TILE:
 		return true
@@ -541,6 +647,8 @@ func _guard_threatens_cell(guard: Dictionary, cell: Vector2i) -> bool:
 
 func _marker_cell(clue_id: String) -> Vector2i:
 	match clue_id:
+		"exit":
+			return Rules.START
 		"bedroom":
 			return Rules.BEDROOM_CLUE
 		"strategy":
@@ -549,9 +657,40 @@ func _marker_cell(clue_id: String) -> Vector2i:
 			return Rules.CHEST
 
 
+func _refresh_markers() -> void:
+	for clue_id in clue_markers:
+		var marker: CanvasItem = clue_markers[clue_id]
+		var cell: Vector2i = _marker_cell(clue_id)
+		if completed:
+			marker.visible = false
+		elif clue_id == "exit":
+			marker.visible = escape_phase and explored_cells.has(cell)
+		elif clue_id == "strategy" and not bedroom_clue_found:
+			marker.visible = false
+		else:
+			var done: bool = (clue_id == "bedroom" and bedroom_clue_found) or (clue_id == "strategy" and strategy_clue_found)
+			marker.visible = visible_cells.has(cell) and not done
+
+
+func _refresh_movement_overlay() -> void:
+	if not is_instance_valid(movement_overlay):
+		return
+	var display_cells: Dictionary = {}
+	if not moving and not failed and not completed and movement_left > 0:
+		var occupied: Array[Vector2i] = []
+		for guard in guards:
+			occupied.append(guard["cell"])
+		for cell in Rules.reachable_cells(player_cell, movement_left, occupied):
+			if visible_cells.has(cell):
+				display_cells[cell] = true
+	movement_overlay.set_reachable(display_cells)
+
+
 func _refresh_interface() -> void:
 	if not is_instance_valid(turn_label):
 		return
+	if is_instance_valid(player_token):
+		player_token.modulate = Color(0.62, 1.0, 0.78, 0.52) if is_stealthed else Color.WHITE
 	if not moving or failed or completed:
 		turn_label.text = "CIDADELA — Rodada %d | Aniri: %d casas de movimento" % [round_number, movement_left]
 	var alert: String = ""
@@ -559,15 +698,15 @@ func _refresh_interface() -> void:
 		if guard["investigating"]:
 			alert = "  |  %s investigando" % guard["name"]
 			break
-	objective_label.text = "Pistas: %d/2  |  Baú: %s  |  Vermelho: visão cultista (6 m)%s%s" % [int(bedroom_clue_found) + int(strategy_clue_found), "coletado" if chest_claimed else "não coletado", "  |  Escondida: teste de Observar" if is_stealthed else "", alert]
+	var objective: String = "Infiltração concluída" if completed else ("FUJA: volte à seta verde no túnel" if escape_phase else ("Encontre a ordem de ataque" if bedroom_clue_found else "Encontre o relatório no quarto"))
+	objective_label.text = "%s  |  Pistas %d/2  |  Baú %s  |  Vermelho: visão (6 m)%s%s" % [objective, int(bedroom_clue_found) + int(strategy_clue_found), "✓" if chest_claimed else "?", "  |  Escondida" if is_stealthed else "", alert]
 	hide_button.disabled = moving or failed or completed or is_stealthed or not Rules.cover_near(player_cell)
 	end_turn_button.disabled = moving or failed or completed
 	retry_button.visible = failed
 	leave_button.visible = not moving
-	for clue_id in clue_markers:
-		var cell: Vector2i = _marker_cell(clue_id)
-		var done: bool = (clue_id == "bedroom" and bedroom_clue_found) or (clue_id == "strategy" and strategy_clue_found) or (clue_id == "chest" and chest_claimed)
-		clue_markers[clue_id].visible = visible_cells.has(cell) and not done
+	leave_button.text = "Voltar ao templo" if completed else "Voltar ao mapa"
+	_refresh_markers()
+	_refresh_movement_overlay()
 
 
 func _set_status(message: String) -> void:
@@ -584,5 +723,5 @@ func _on_leave_pressed() -> void:
 		return
 	if MusicManage.music_player != null and MusicManage.music_player.stream != null and MusicManage.music_player.stream.resource_path == STEALTH_MUSIC_PATH:
 		MusicManage.stop_music()
-	GameState.current_location = "citadel"
-	SceneTransition.change_scene_to_file(WORLD_MAP_SCENE)
+	GameState.current_location = "temple_hall" if completed else "citadel"
+	SceneTransition.change_scene_to_file(TEMPLE_HALL_SCENE if completed else WORLD_MAP_SCENE)

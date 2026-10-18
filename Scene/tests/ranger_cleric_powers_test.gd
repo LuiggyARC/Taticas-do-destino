@@ -74,6 +74,9 @@ func _ready() -> void:
 	cleric_combat.hero = cleric
 	cleric_combat.current_active_unit = cleric
 	assert(cleric_combat.can_select_cleric_power(cleric, "cleric_guarding_light"))
+	cleric.has_attacked = true
+	assert(cleric_combat.can_select_cleric_power(cleric, "cleric_guarding_light"))
+	cleric.has_attacked = false
 	assert(cleric_combat.get_cleric_power_healing(cleric, "cleric_helping_prayer") == 12)
 	cleric_combat.free()
 	cleric.free()

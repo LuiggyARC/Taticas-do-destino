@@ -312,6 +312,11 @@ func _ready() -> void:
 	set_process_input(
 		true
 	)
+	if MissionManager.is_mission_active("temple_return_to_village"):
+		var previous_missions: Dictionary = MissionManager.get_save_data()
+		MissionManager.complete_mission("temple_return_to_village")
+		if not SaveManager.save_village_state():
+			MissionManager.load_save_data(previous_missions)
 	
 	sync_available_party_members()
 	

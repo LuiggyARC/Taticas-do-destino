@@ -378,6 +378,9 @@ func get_speaker_portrait_path(
 	
 	if normalized_speaker.contains("hashagur"):
 		return "res://Assets/Characters/Hashagur.png"
+
+	if normalized_speaker.contains("ebramir"):
+		return "res://Assets/Maps/Ebramir.png"
 	
 	if normalized_speaker.contains("kasum"):
 		return "res://Assets/Characters/Kasum.png"

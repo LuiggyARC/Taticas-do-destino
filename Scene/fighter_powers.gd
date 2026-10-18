@@ -12,7 +12,8 @@ const POWERS := [
 		"id": "fighter_steady_stance",
 		"name": "Postura Firme",
 		"frequency": "Por encontro",
-		"description": "Receba +2 na Classe de Armadura até o início do seu próximo turno. Usa a ação principal."
+		"utility": true,
+		"description": "Receba +2 na Classe de Armadura até o início do seu próximo turno. Ativa ao selecionar, sem gastar ataque."
 	},
 	{
 		"id": "fighter_breaking_strike",

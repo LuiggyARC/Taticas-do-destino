@@ -9,6 +9,10 @@ static func get_scenario_data(stage_number: int) -> Dictionary:
 			return get_stage_2()
 		3:
 			return get_stage_3()
+		4:
+			return get_stage_4()
+		5:
+			return get_stage_5()
 		_:
 			return get_stage_1()
 
@@ -228,6 +232,8 @@ static func get_scenario_music_volume_percent(
 	match stage_number:
 		1:
 			return 80.0
+		4:
+			return 76.0
 		
 		_:
 			return 100.0
@@ -773,6 +779,9 @@ static func get_scenario_intro_sequence(
 				]
 			}
 		
+		4:
+			# A conversa e a revelação dos inimigos já ocorreram no mapa do templo.
+			return {"type": "scripted_dialogue", "steps": []}
 		_:
 			return {}
 
@@ -1160,6 +1169,101 @@ static func get_stage_3() -> Dictionary:
 			}
 		]
 	}
+
+static func get_stage_4() -> Dictionary:
+	var blocked: Array[Vector2i] = []
+	# A muralha de fogo atravessa o salão inteiro; ninguém pode alcançá-lo.
+	for y in range(24):
+		blocked.append(Vector2i(17, y))
+	# Bancadas de madeira próximas às paredes oeste.
+	for x in range(2, 8):
+		for y in range(2, 4):
+			blocked.append(Vector2i(x, y))
+	for x in range(2, 8):
+		for y in range(20, 22):
+			blocked.append(Vector2i(x, y))
+	return {
+		"id": 4,
+		"name": "Templo de Hashagur — Rota de Fuga",
+		"description": "A muralha de fogo separou Hashagur do grupo. Elimine os cinco cultistas que bloqueiam a saída.",
+		"grid_width": 32,
+		"grid_height": 24,
+		"tile_size": 64,
+		"background_image": "res://Assets/Maps/Templobatalha.jpg",
+		"music": "res://Assets/Audio/Batalha dentro templo.mp3",
+		"music_start": "initiative",
+		"player_start": Vector2i(12, 11),
+		"companion_start": Vector2i(13, 12),
+		"camera_start": Vector2i(10, 12),
+		"victory_conditions": [{"type": "eliminate_enemies_by_id", "monster_id": "Cultista", "description": "Elimine os cinco cultistas e abra a rota de fuga enquanto Hashagur resiste do outro lado."}],
+		"defeat_conditions": [
+			{"type": "hero_defeated", "description": "O aventureiro foi derrotado."},
+			{"type": "npc_defeated", "npc_id": "Hashagur", "description": "Hashagur foi derrotado antes de a rota de fuga ser aberta."}
+		],
+		"npcs": [
+			{"npc_id": "Sr Uiliam", "display_name": "Sir Uiliam", "position": Vector2i(12, 9), "control_type": "player"},
+			{"npc_id": "Aniri", "display_name": "Aniri", "position": Vector2i(11, 13), "control_type": "player"},
+			{"npc_id": "Kasum", "display_name": "Kasum", "position": Vector2i(12, 15), "control_type": "player"},
+			{"npc_id": "Hashagur", "display_name": "Hashagur", "position": Vector2i(22, 11), "control_type": "player"}
+		],
+		"terrain": {"difficult": [], "blocked": blocked, "danger": []},
+		"high_ground": [],
+		"high_ground_attack_bonus": 0,
+		"interactions": [],
+		"enemies": [
+			{"monster_id": "Cultista", "display_name": "Cultista 1", "position": Vector2i(3, 7)},
+			{"monster_id": "Cultista", "display_name": "Cultista 2", "position": Vector2i(4, 9)},
+			{"monster_id": "Cultista", "display_name": "Cultista 3", "position": Vector2i(3, 12)},
+			{"monster_id": "Cultista", "display_name": "Cultista 4", "position": Vector2i(4, 15)},
+			{"monster_id": "Cultista", "display_name": "Cultista 5", "position": Vector2i(3, 18)},
+			{"monster_id": "Guardião do Culto", "display_name": "Guardião 1", "position": Vector2i(24, 9)},
+			{"monster_id": "Guardião do Culto", "display_name": "Guardião 2", "position": Vector2i(24, 13)},
+			{"monster_id": "Arqueiro do Culto", "display_name": "Arqueiro 1", "position": Vector2i(27, 8)},
+			{"monster_id": "Arqueiro do Culto", "display_name": "Arqueiro 2", "position": Vector2i(27, 14)},
+			{"monster_id": "Ebramir", "display_name": "Ebramir", "position": Vector2i(28, 11)}
+		]
+	}
+
+
+static func get_stage_5() -> Dictionary:
+	var blocked: Array[Vector2i] = []
+	# As rochas e as muretas pertencem ao mapa externo de 32 x 24 casas.
+	for area in [Rect2i(7, 5, 3, 5), Rect2i(13, 5, 4, 5), Rect2i(20, 5, 3, 5), Rect2i(7, 17, 4, 4), Rect2i(13, 17, 4, 4), Rect2i(20, 17, 4, 4), Rect2i(26, 4, 2, 6), Rect2i(26, 10, 2, 7), Rect2i(26, 17, 2, 5)]:
+		for x in range(area.position.x, area.end.x):
+			for y in range(area.position.y, area.end.y):
+				blocked.append(Vector2i(x, y))
+	return {
+		"id": 5,
+		"name": "Templo de Hashagur — Pátio Externo",
+		"description": "As portas foram seladas. Elimine os cultistas restantes no pátio.",
+		"grid_width": 32,
+		"grid_height": 24,
+		"tile_size": 64,
+		"background_image": "res://Assets/Maps/Chegada ao templo.jpg",
+		"music": "res://Assets/Audio/Luta fora templo.mp3",
+		"music_start": "arrival",
+		"player_start": Vector2i(23, 12),
+		"companion_start": Vector2i(24, 12),
+		"camera_start": Vector2i(20, 12),
+		"victory_conditions": [{"type": "eliminate_all_enemies", "description": "Elimine os cultistas restantes no pátio."}],
+		"defeat_conditions": [{"type": "hero_defeated", "description": "O aventureiro foi derrotado."}],
+		"npcs": [
+			{"npc_id": "Sr Uiliam", "display_name": "Sir Uiliam", "position": Vector2i(24, 11), "control_type": "player"},
+			{"npc_id": "Aniri", "display_name": "Aniri", "position": Vector2i(24, 13), "control_type": "player"},
+			{"npc_id": "Kasum", "display_name": "Kasum", "position": Vector2i(23, 14), "control_type": "player"}
+		],
+		"terrain": {"difficult": [], "blocked": blocked, "danger": []},
+		"high_ground": [],
+		"high_ground_attack_bonus": 0,
+		"interactions": [],
+		"enemies": [
+			{"monster_id": "Cultista", "display_name": "Cultista do Pátio 1", "position": Vector2i(5, 12)},
+			{"monster_id": "Cultista", "display_name": "Cultista do Pátio 2", "position": Vector2i(7, 14)},
+			{"monster_id": "Cultista", "display_name": "Cultista do Pátio 3", "position": Vector2i(10, 11)},
+			{"monster_id": "Cultista", "display_name": "Cultista do Pátio 4", "position": Vector2i(11, 15)}
+		]
+	}
+
 
 static func get_scenario_round_events(
 	stage_number: int
@@ -1740,6 +1844,12 @@ Novo objetivo|Siga Sir Uiliam até a vila. Encontre-o na taverna e descubra mais
 		
 		_:
 			return {}
+
+
+static func get_stage_4_victory_sequence() -> Dictionary:
+	return {
+		"next_scene": "res://Scene/main.tscn"
+	}
 
 
 static func assemble_stage_1_victory_dialogues(

@@ -2,6 +2,7 @@ extends Node2D
 
 const LevelProgressionData = preload("res://Scene/level_progression.gd")
 const ClassPowerProgressionData = preload("res://Scene/class_power_progression.gd")
+const BattleTokenVisual = preload("res://Scene/battle_unit_token.gd")
 
 const TILE_SIZE := 64
 
@@ -73,7 +74,12 @@ var max_movement_meters: float = 9.0
 var current_movement_meters: float = 9.0
 var pending_level_ups: int = 0
 
-var has_attacked: bool = false
+var attacks_used_this_turn: int = 0
+var has_attacked: bool:
+	get:
+		return attacks_used_this_turn >= get_max_attack_actions()
+	set(value):
+		attacks_used_this_turn = mini(attacks_used_this_turn + 1, get_max_attack_actions()) if value else 0
 var has_opportunity_attacked: bool = false
 var opportunity_attacks_used: int = 0
 var feat_extra_opportunity_attacks: int = 0
@@ -177,20 +183,23 @@ func _ready():
 
 
 func create_visual():
-	var body := ColorRect.new()
-	body.name = "Body"
-	body.size = Vector2(48, 48)
-	body.position = Vector2(-24, -24)
-	body.color = Color(0.1, 0.3, 1.0)
-	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(body)
+	var token: Node2D = BattleTokenVisual.new()
+	token.name = "BattleToken"
+	add_child(token)
+	refresh_battle_token()
 	
 	create_health_bar()
 	update_hidden_visual()
 
 
+func refresh_battle_token() -> void:
+	var token: Node2D = get_node_or_null("BattleToken")
+	if is_instance_valid(token):
+		token.configure(str(GameState.player_portrait_path), "ally", character_name)
+
+
 func update_hidden_visual() -> void:
-	var body_visual: CanvasItem = get_node_or_null("Body") as CanvasItem
+	var body_visual: CanvasItem = get_node_or_null("BattleToken") as CanvasItem
 	if not is_instance_valid(body_visual):
 		return
 	var tint: Color = body_visual.modulate
@@ -223,6 +232,14 @@ func reset_movement():
 	has_opportunity_attacked = false
 	opportunity_attacks_used = 0
 	hide_used_this_turn = false
+
+
+func get_max_attack_actions() -> int:
+	return 1 + int(level >= 5) + int(level >= 10)
+
+
+func get_remaining_attack_actions() -> int:
+	return maxi(0, get_max_attack_actions() - attacks_used_this_turn)
 
 
 func take_damage(amount: int):
@@ -287,6 +304,7 @@ func apply_character_data(
 ):
 	character_name = new_name
 	character_class = new_class
+	refresh_battle_token()
 	
 	level = new_level
 	total_xp = new_total_xp

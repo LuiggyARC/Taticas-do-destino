@@ -47,7 +47,7 @@ static func get_new_power_for_level(character_class: String, level: int) -> Dict
 	var bonus_damage: int = 0 if utility else maxi(1, ceili(float(level) / 3.0))
 	var description: String = ""
 	if utility:
-		description = "Recupera %d PV e ganha +3 m de movimento neste turno. Usa a ação principal." % (3 + level)
+		description = "Recupera %d PV e ganha +3 m de movimento neste turno ao selecionar. Não gasta ataque." % (3 + level)
 	elif mode == "magic":
 		description = "Ataque mágico a até 9 m: 1d6 + atributo mágico +%d de dano. Usa a ação de ataque." % bonus_damage
 	else:
@@ -77,7 +77,7 @@ static func get_power_options_for_level(character_class: String, level: int) -> 
 	alternate["name"] = "%s %d" % [style["alternate_utility"] if utility else style["alternate_attack"], level]
 	if utility:
 		alternate["utility_effect"] = "movement"
-		alternate["description"] = "Ganha +6 m de movimento neste turno. Usa a ação principal."
+		alternate["description"] = "Ganha +6 m de movimento neste turno ao selecionar. Não gasta ataque."
 		primary["utility_effect"] = "recovery"
 	else:
 		alternate["attack_bonus"] = 2

@@ -6,7 +6,11 @@ const HALL_MAP_PATH := "res://Assets/Maps/Templo.jpg"
 const TEMPLE_MUSIC_PATH := "res://Assets/Audio/Moonlight_on_Empty_Wood.mp3"
 const FEEDBACK_URL := "https://docs.google.com/forms/d/e/1FAIpQLSdVqP7LyWeAEgfNX19Q9HgOJkb5CmsrIM9nA867sEn6D13Aiw/viewform?usp=publish-editor"
 const HALL_STORY_EVENT_ID := "temple_hashagur_briefing"
+const CITADEL_RETURN_EVENT_ID := "citadel_aniri_return_warning"
 const CITADEL_MISSION_ID := "shadows_citadel"
+const TEMPLE_BATTLE_INTRO_EVENT_ID := "temple_battle_intro_seen"
+const TEMPLE_ESCAPE_MISSION_ID := "temple_escape_route"
+const TEMPLE_BATTLE_INTRO_SCENE := "res://Scene/temple_battle_intro.tscn"
 
 var status_label: Label
 var map_button: Button
@@ -22,10 +26,51 @@ func _ready() -> void:
 		var player: AudioStreamPlayer = MusicManage.music_player
 		if not player.playing or player.stream == null or player.stream.resource_path != TEMPLE_MUSIC_PATH:
 			MusicManage.play_music(TEMPLE_MUSIC_PATH, 70.0)
+	# Saves antigos terminavam a primeira luta neste salão. Retome-os no
+	# exterior, sem conceder recompensas novamente nem reiniciar a batalha.
+	if MissionManager.is_mission_completed(TEMPLE_ESCAPE_MISSION_ID) and not MissionManager.is_mission_completed("temple_courtyard_defense"):
+		call_deferred("_resume_legacy_temple_escape")
+		return
 	if SaveManager.has_completed_story_event(HALL_STORY_EVENT_ID):
-		_show_citadel_objective()
+		if MissionManager.is_mission_completed(CITADEL_MISSION_ID):
+			if SaveManager.has_completed_story_event(CITADEL_RETURN_EVENT_ID):
+				if MissionManager.is_mission_completed(TEMPLE_ESCAPE_MISSION_ID):
+					_show_after_battle_objective()
+				elif SaveManager.has_completed_story_event(TEMPLE_BATTLE_INTRO_EVENT_ID):
+					_show_after_return_objective()
+				else:
+					call_deferred("_go_to_battle_intro")
+			else:
+				call_deferred("_play_return_story")
+		else:
+			_show_citadel_objective()
 	else:
 		call_deferred("_play_hall_story")
+
+
+func _resume_legacy_temple_escape() -> void:
+	var save_path: String = SaveManager.get_active_save_path()
+	var save_data: Dictionary = SaveManager.read_save_data(save_path)
+	if save_data.is_empty():
+		status_label.text = "Não foi possível recuperar a saída do templo."
+		return
+	var previous_missions: Dictionary = MissionManager.get_save_data()
+	if not MissionManager.is_mission_active("temple_courtyard_defense"):
+		MissionManager.start_mission({
+			"id": "temple_courtyard_defense",
+			"title": "Sobreviva ao ataque",
+			"description": "As portas estão seladas. Elimine os cultistas restantes no pátio externo."
+		})
+	save_data["missions"] = MissionManager.get_save_data()
+	save_data["current_stage"] = 5
+	save_data["current_location"] = "temple_gate"
+	if not SaveManager.write_save_data(save_path, save_data):
+		MissionManager.load_save_data(previous_missions)
+		status_label.text = "Não foi possível salvar a continuação do ataque."
+		return
+	GameState.selected_stage = 5
+	GameState.current_location = "temple_gate"
+	SceneTransition.change_scene_to_file("res://Scene/temple_gate.tscn")
 
 
 func _play_hall_story() -> void:
@@ -49,6 +94,48 @@ func _play_hall_story() -> void:
 		map_button.visible = true
 		return
 	_show_citadel_objective()
+
+
+func _play_return_story() -> void:
+	map_button.visible = false
+	story_event_controller = VillageStoryEventScript.new()
+	add_child(story_event_controller)
+	story_event_controller.story_dialog.hide_missing_cinematic_portraits = true
+	for scene_id_variant in TempleHallDatabase.RETURN_ORDER:
+		var scene_id: String = str(scene_id_variant)
+		var scene: Array[Dictionary] = TempleHallDatabase.get_scene(scene_id)
+		if scene.is_empty():
+			push_error("Trecho do retorno ao templo não encontrado: " + scene_id)
+			return
+		var cast: Array[String] = []
+		for speaker in TempleHallDatabase.CASTS.get(scene_id, []):
+			cast.append(str(speaker))
+		await story_event_controller.start_event(
+			"temple_hall_" + scene_id, scene, cast, "Aniri"
+		)
+	if not _save_return_story():
+		push_warning("Não foi possível salvar o aviso de Aniri no templo.")
+		status_label.text = "O templo está sob ataque, mas não foi possível salvar a conversa. Abra o mapa para tentar novamente."
+		map_button.visible = true
+		return
+	_go_to_battle_intro()
+
+
+func _go_to_battle_intro() -> void:
+	SceneTransition.change_scene_to_file(TEMPLE_BATTLE_INTRO_SCENE)
+
+
+func _save_return_story() -> bool:
+	var save_path: String = SaveManager.get_active_save_path()
+	var save_data: Dictionary = SaveManager.read_save_data(save_path)
+	if save_data.is_empty():
+		return false
+	var completed_events: Array = save_data.get("completed_story_events", [])
+	if CITADEL_RETURN_EVENT_ID not in completed_events:
+		completed_events.append(CITADEL_RETURN_EVENT_ID)
+	save_data["completed_story_events"] = completed_events
+	save_data["current_location"] = "temple_hall"
+	return SaveManager.write_save_data(save_path, save_data)
 
 
 func _save_hall_story() -> bool:
@@ -79,6 +166,16 @@ func _save_hall_story() -> bool:
 
 func _show_citadel_objective() -> void:
 	status_label.text = "Missão disponível: Sombras da Cidadela. No mapa, siga até a Cidadela Abandonada para iniciar a infiltração com Aniri."
+	map_button.visible = true
+
+
+func _show_after_return_objective() -> void:
+	status_label.text = "O templo está sob ataque. Hashagur ordenou a defesa dos portões."
+	map_button.visible = true
+
+
+func _show_after_battle_objective() -> void:
+	status_label.text = "A rota de fuga foi aberta. O grupo ainda precisa decidir como ajudar Hashagur."
 	map_button.visible = true
 
 
@@ -173,5 +270,8 @@ func _on_menu_pressed() -> void:
 func _on_map_pressed() -> void:
 	if not SaveManager.has_completed_story_event(HALL_STORY_EVENT_ID) and not _save_hall_story():
 		status_label.text = "Não foi possível salvar a nova missão. Tente novamente."
+		return
+	if MissionManager.is_mission_completed(CITADEL_MISSION_ID) and not SaveManager.has_completed_story_event(CITADEL_RETURN_EVENT_ID) and not _save_return_story():
+		status_label.text = "Não foi possível salvar o retorno de Aniri. Tente novamente."
 		return
 	SceneTransition.change_scene_to_file("res://Scene/world_map.tscn")

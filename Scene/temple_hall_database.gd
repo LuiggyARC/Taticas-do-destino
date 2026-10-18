@@ -189,6 +189,77 @@ Hashagur|O túnel é mais seguro depois que escurece.
 Kasum|“Mais seguro” costuma significar o quê neste grupo?
 Aniri|Que talvez não morramos.
 Kasum|Estou começando a entender.
+""",
+	"return_to_temple": """
+Ação|Horas depois, Uiliam, o aventureiro, Kasum e Hashagur aguardam no salão principal do templo.
+Ação|Passos apressados ecoam pelo corredor. Aniri surge na entrada, coberta de poeira.
+Aventureiro|Aniri!
+Ação|Ele se aproxima imediatamente.
+Aniri|Estou inteira.
+Aventureiro|Demorou.
+Aniri|O caminho não colaborou.
+Sir Uiliam|Encontrou alguma coisa?
+Ação|Aniri retira o primeiro documento.
+Aniri|Encontrei o nome de quem está comandando aquela gente.
+Hashagur|Quem?
+Aniri|Ebramir. Um gnomo.
+Ação|Ela entrega o relatório a Uiliam.
+Aniri|E isso é pior.
+Sir Uiliam|Eles realizaram um ritual próximo a Montirel...
+Aventureiro|E depois?
+Sir Uiliam|Nada. Até o dia seguinte.
+Hashagur|A fenda.
+Sir Uiliam|Sim.
+Aventureiro|Então o ritual funcionou.
+Hashagur|Ao menos parece que sim.
+Sir Uiliam|Há mais. Cultistas próximos ao local sentiram fortes dores de cabeça. Alguns desmaiaram antes da abertura.
+Hashagur|E o Selo?
+Sir Uiliam|Ebramir diz não saber por que caiu.
+Aniri|Então temos uma resposta e outro problema.
+Kasum|Quantos problemas?
+Aniri|Um bastante imediato.
+""",
+	"second_document": """
+Ação|Aniri coloca o segundo papel sobre a mesa. Hashagur começa a ler; seu rosto endurece.
+Aniri|Encontrei isso depois.
+Sir Uiliam|O que diz?
+Hashagur|Retaliação.
+@pause
+Hashagur|Contra este templo.
+Ação|Todos ficam sérios.
+Aniri|Eles querem vingança pelo que aconteceu com o antigo culto.
+Aventureiro|Quando?
+Aniri|A marcha estava marcada para esta madrugada.
+Hashagur|Quantos?
+Aniri|Não sei exatamente. Acho que uns vinte antes de sair.
+Ação|Hashagur olha para a porta.
+Aniri|E ouvi dois deles conversando. A força principal já tinha partido.
+@pause
+Sir Uiliam|Quanto tempo faz?
+Aniri|Tempo demais.
+""",
+	"temple_bells": """
+Ação|Antes que alguém diga mais alguma coisa, um sino pesado ecoa por todo o templo. DONG.
+Ação|Hashagur ergue imediatamente a cabeça. DONG.
+Aventureiro|O que significa?
+Ação|DONG. Gritos começam a surgir do lado de fora.
+Hashagur|Ataque.
+Ação|Um jovem discípulo entra correndo.
+Discípulo|Mestre! Homens se aproximam pela mata! Muitos!
+Ação|Hashagur pega sua arma.
+Hashagur|Fechem os portões. Todos para suas posições.
+Ação|O discípulo corre.
+Sir Uiliam|Quantos homens consegue colocar na defesa?
+Hashagur|Menos do que preciso.
+Kasum|Agora tem quatro a mais.
+Ação|Hashagur olha para ele.
+Kasum|Não precisa agradecer. Ainda estou decidindo quanto isso vale.
+Aniri|Kasum.
+Kasum|Depois.
+Aventureiro|Você chegou a tempo.
+Ação|Aniri olha para os portões.
+Aniri|Espero que sim.
+Ação|Outro sino toca.
 """
 }
 
@@ -196,6 +267,8 @@ const ORDER := [
 	"temple", "old_cult", "smaller_temple", "golden_question",
 	"citadel", "alone_first", "alone_second", "plan_first", "plan_second"
 ]
+
+const RETURN_ORDER := ["return_to_temple", "second_document", "temple_bells"]
 
 const CASTS := {
 	"temple": ["Hashagur", "Sir Uiliam", "Kasum", "Aniri"],
@@ -206,7 +279,10 @@ const CASTS := {
 	"alone_first": ["Aniri", "Aventureiro", "Hashagur", "Sir Uiliam"],
 	"alone_second": ["Aniri", "Aventureiro", "Kasum", "Sir Uiliam"],
 	"plan_first": ["Hashagur", "Sir Uiliam", "Aventureiro"],
-	"plan_second": ["Aniri", "Kasum"]
+	"plan_second": ["Aniri", "Kasum"],
+	"return_to_temple": ["Sir Uiliam", "Aventureiro", "Aniri", "Kasum", "Hashagur"],
+	"second_document": ["Sir Uiliam", "Aventureiro", "Aniri", "Kasum", "Hashagur"],
+	"temple_bells": ["Sir Uiliam", "Aventureiro", "Aniri", "Kasum", "Hashagur"]
 }
 
 

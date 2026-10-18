@@ -1,4 +1,5 @@
 extends Node2D
+const BattleTokenVisual = preload("res://Scene/battle_unit_token.gd")
 
 
 signal health_changed(
@@ -54,11 +55,22 @@ var status_effects: Dictionary = {}
 var max_movement_meters: float = 12.0
 var current_movement_meters: float = 12.0
 
-var has_attacked: bool = false
+var attacks_used_this_turn: int = 0
+var has_attacked: bool:
+	get:
+		return attacks_used_this_turn >= get_max_attack_actions()
+	set(value):
+		attacks_used_this_turn = mini(attacks_used_this_turn + 1, get_max_attack_actions()) if value else 0
 var has_opportunity_attacked: bool = false
 
 var owner_class: String = ""
 var owner_level: int = 1
+
+func get_max_attack_actions() -> int:
+	return 1 + int(owner_level >= 5) + int(owner_level >= 10)
+
+func get_remaining_attack_actions() -> int:
+	return maxi(0, get_max_attack_actions() - attacks_used_this_turn)
 var temporary_attack_bonus: int = 0
 var temporary_damage_bonus: int = 0
 var temporary_armor_class_bonus: int = 0
@@ -74,6 +86,10 @@ func _ready() -> void:
 	visible = true
 	
 	update_world_position()
+	var token: Node2D = BattleTokenVisual.new()
+	token.name = "BattleToken"
+	add_child(token)
+	token.configure(BattleTokenVisual.companion_portrait_path(companion_type), "companion", companion_type)
 	create_health_bar()
 	update_health_display()
 
@@ -93,6 +109,9 @@ func setup_companion(
 	
 	apply_companion_type_data()
 	apply_level_bonus()
+	var token: Node2D = get_node_or_null("BattleToken")
+	if is_instance_valid(token):
+		token.configure(BattleTokenVisual.companion_portrait_path(companion_type), "companion", companion_type)
 	
 	hp = max_hp
 	current_movement_meters = (

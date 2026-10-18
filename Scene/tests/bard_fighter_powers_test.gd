@@ -48,6 +48,10 @@ func _ready() -> void:
 	combat.current_active_unit = bard
 	assert(combat.can_select_bard_power(bard, "bard_precise_rhythm"))
 	assert(combat.can_select_bard_power(bard, "bard_courage_refrain"))
+	bard.has_attacked = true
+	assert(combat.can_select_bard_power(bard, "bard_courage_refrain"))
+	assert(not combat.can_select_bard_power(bard, "bard_precise_rhythm"))
+	bard.has_attacked = false
 	assert(combat.get_bard_renewal_healing(bard) == 10)
 	assert(combat.get_bard_refrain_duration(bard) == 3)
 	combat.prepared_class_attack = "bard_precise_rhythm"
@@ -84,6 +88,10 @@ func _ready() -> void:
 	fighter_combat.current_active_unit = fighter
 	assert(fighter_combat.can_select_fighter_power(fighter, "fighter_technical_strike"))
 	assert(fighter_combat.can_select_fighter_power(fighter, "fighter_steady_stance"))
+	fighter.has_attacked = true
+	assert(fighter_combat.can_select_fighter_power(fighter, "fighter_steady_stance"))
+	assert(not fighter_combat.can_select_fighter_power(fighter, "fighter_technical_strike"))
+	fighter.has_attacked = false
 	fighter_combat.prepared_class_attack = "fighter_breaking_strike"
 	fighter_combat.prepared_class_attacker = fighter
 	assert(fighter_combat.get_prepared_fighter_attack_bonus(fighter) == 2)

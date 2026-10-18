@@ -79,6 +79,8 @@ const ClericPowers := preload("res://Scene/cleric_powers.gd")
 const BardPowers := preload("res://Scene/bard_powers.gd")
 const FighterPowers := preload("res://Scene/fighter_powers.gd")
 const MonkPowers := preload("res://Scene/monk_powers.gd")
+const TempleDuelData := preload("res://Scene/temple_duel_data.gd")
+const TempleBattleOutroData := preload("res://Scene/temple_battle_outro_database.gd")
 const WarlockPowers := preload("res://Scene/warlock_powers.gd")
 const ClassPowerProgressionData := preload("res://Scene/class_power_progression.gd")
 const LevelProgressionData := preload("res://Scene/level_progression.gd")
@@ -151,6 +153,8 @@ var stage_3_night_tint: CanvasModulate
 var stage_3_work_tween: Tween
 var stage_3_convoy: Node2D
 var stage_3_reinforcements: Array[Node2D] = []
+var temple_fire_wall: Polygon2D
+var temple_courtyard_gate: Node2D
 var combat_feedback: Node
 
 var current_grid_width: int = GRID_WIDTH
@@ -2115,7 +2119,7 @@ func get_attack_distance(from_position: Vector2i, to_position: Vector2i) -> int:
 	
 	return max(dx, dy)
 
-func enemy_turn():
+func enemy_turn(refresh_turn_resources: bool = true):
 	if not initiative_started:
 		print(
 			"Inimigo não pode agir antes da iniciativa."
@@ -2190,11 +2194,11 @@ func enemy_turn():
 			enemy.control_movement_penalty
 		)
 	
-	if enemy.has_method(
+	if refresh_turn_resources and enemy.has_method(
 		"reset_movement"
 	):
 		enemy.reset_movement()
-	else:
+	elif refresh_turn_resources:
 		var movement_penalty: float = 0.0
 		
 		if "control_movement_penalty" in enemy:
@@ -2211,9 +2215,8 @@ func enemy_turn():
 		enemy.has_attacked = false
 		enemy.has_opportunity_attacked = false
 	
-	apply_active_spell_area_to_unit(
-		enemy
-	)
+	if refresh_turn_resources:
+		apply_active_spell_area_to_unit(enemy)
 	
 	if is_current_enemy_unable_to_act():
 		return
@@ -2721,6 +2724,66 @@ func get_opportunity_attackers_for_move(mover: Node2D, destination: Vector2i) ->
 		attackers.append(enemy)
 	return attackers
 
+func _update_temple_fire_wall() -> void:
+	if is_instance_valid(temple_fire_wall):
+		temple_fire_wall.queue_free()
+		temple_fire_wall = null
+	if current_stage != 4 or not is_instance_valid(board_root):
+		return
+	var left: float = 17.0 * TILE_SIZE
+	var right: float = 18.0 * TILE_SIZE
+	var height: float = float(current_grid_height * TILE_SIZE)
+	temple_fire_wall = Polygon2D.new()
+	temple_fire_wall.name = "TempleFireWall"
+	temple_fire_wall.polygon = PackedVector2Array([
+		Vector2(left, 0.0), Vector2(right, 0.0),
+		Vector2(right, height), Vector2(left, height)
+	])
+	temple_fire_wall.color = Color(1.0, 0.32, 0.04, 0.72)
+	temple_fire_wall.z_index = 5
+	board_root.add_child(temple_fire_wall)
+
+
+func _update_temple_courtyard_gate() -> void:
+	if is_instance_valid(temple_courtyard_gate):
+		temple_courtyard_gate.queue_free()
+		temple_courtyard_gate = null
+	if current_stage != 5 or not is_instance_valid(board_root):
+		return
+	temple_courtyard_gate = Node2D.new()
+	temple_courtyard_gate.name = "PortoesSelados"
+	temple_courtyard_gate.z_index = 2
+	board_root.add_child(temple_courtyard_gate)
+	var x_left: float = 26.0 * TILE_SIZE
+	var x_middle: float = 27.0 * TILE_SIZE
+	var x_right: float = 28.0 * TILE_SIZE
+	var y_top: float = 10.0 * TILE_SIZE
+	var y_bottom: float = 17.0 * TILE_SIZE
+	for panel_bounds in [Rect2(x_left, y_top, TILE_SIZE, y_bottom - y_top), Rect2(x_middle, y_top, TILE_SIZE, y_bottom - y_top)]:
+		var panel := Polygon2D.new()
+		panel.polygon = PackedVector2Array([
+			panel_bounds.position,
+			Vector2(panel_bounds.end.x, panel_bounds.position.y),
+			panel_bounds.end,
+			Vector2(panel_bounds.position.x, panel_bounds.end.y)
+		])
+		panel.color = Color(0.17, 0.095, 0.055, 0.96)
+		temple_courtyard_gate.add_child(panel)
+	for edge_x in [x_left, x_middle, x_right]:
+		var edge := Line2D.new()
+		edge.width = 5.0
+		edge.default_color = Color(0.45, 0.31, 0.17, 0.95)
+		edge.points = PackedVector2Array([Vector2(edge_x, y_top), Vector2(edge_x, y_bottom)])
+		temple_courtyard_gate.add_child(edge)
+	for band_y in [y_top + 28.0, y_bottom - 28.0]:
+		var band := Line2D.new()
+		band.width = 9.0
+		band.default_color = Color(0.32, 0.25, 0.15, 0.9)
+		band.points = PackedVector2Array([Vector2(x_left, band_y), Vector2(x_right, band_y)])
+		temple_courtyard_gate.add_child(band)
+
+
+
 func start_stage(
 	stage_number: int
 ):
@@ -2787,11 +2850,15 @@ func start_stage(
 	clear_attack_area()
 	draw_scenario_background()
 	draw_grid()
+	_update_temple_fire_wall()
+	_update_temple_courtyard_gate()
 	update_movement_label()
 	update_enemy_hp_bar()
 	update_class_skill_button()
 	update_turn_counter_label()
 	update_active_effects_panel()
+	if current_stage == 5:
+		start_current_scenario_music()
 	
 	if is_instance_valid(
 		combat_action_panel_controller
@@ -3249,7 +3316,10 @@ func open_fighter_abilities(unit: Node2D) -> void:
 func open_monk_abilities(unit: Node2D) -> void:
 	if not is_instance_valid(unit) or get_unit_class_name(unit) != "Monge":
 		return
-	open_class_ability_menu(unit, "Monge", MonkPowers.get_powers())
+	var powers: Array = MonkPowers.get_powers_for_level(int(unit.level))
+	if current_stage == 4 and is_npc_unit(unit) and unit.npc_id == "Hashagur":
+		powers.append_array(TempleDuelData.HASHAGUR_POWERS)
+	open_class_ability_menu(unit, "Monge", powers)
 
 
 func open_warlock_abilities(unit: Node2D) -> void:
@@ -3421,11 +3491,11 @@ func open_class_ability_menu(unit: Node2D, ability_class: String, powers: Array)
 				detail.text += " Já usada neste combate."
 			elif power_id == "fighter_breaking_strike" and not is_class_daily_power_available(unit, power_id):
 				detail.text += " Já usada; recupere-a descansando."
-			elif power_id == "monk_flurry" and unit.encounter_powers_used.has(power_id):
+			elif power_id == "monk_flurry" and unit.encounter_powers_used.has(power_id) and not MonkPowers.is_flurry_unlimited(int(unit.level)):
 				detail.text += " Já usada neste combate."
 			elif power_id == "warlock_binding_burst" and unit.encounter_powers_used.has(power_id):
 				detail.text += " Já usada neste combate."
-			elif power_id in ["monk_inner_force", "warlock_pact_judgment"] and not is_class_daily_power_available(unit, power_id):
+			elif power_id in ["monk_inner_force", "monk_ki_breath", "warlock_pact_judgment"] and not is_class_daily_power_available(unit, power_id):
 				detail.text += " Já usada; recupere-a descansando."
 			elif ability_class == "Bruxo":
 				detail.text += " Requer ação de ataque livre."
@@ -3480,6 +3550,8 @@ func select_barbarian_power(unit: Node2D, power_id: String) -> void:
 			use_barbarian_rage()
 		else:
 			unit.activate_rage(battle_turn_count)
+			if unit.is_raging and UIAudioManager != null:
+				UIAudioManager.play_rage()
 			show_floating_text_on_unit(unit, "FÚRIA!", 26, "critical")
 			update_class_skill_button()
 			update_active_effects_panel()
@@ -3694,8 +3766,6 @@ func consume_prepared_ranger_power(unit: Node2D) -> bool:
 func can_select_cleric_power(unit: Node2D, power_id: String) -> bool:
 	if not is_instance_valid(unit) or unit != get_acting_unit() or get_unit_class_name(unit) != "Clérigo":
 		return false
-	if unit.has_attacked:
-		return false
 	match power_id:
 		"cleric_guarding_light":
 			return true
@@ -3752,7 +3822,6 @@ func select_cleric_power(unit: Node2D, power_id: String) -> void:
 			for ally in wounded_allies:
 				apply_healing_to_unit(ally, healing)
 			show_floating_text_on_unit(unit, "AURORA RENOVADORA", 20, "heal")
-	unit.has_attacked = true
 	clear_attack_area()
 	refresh_action_ui()
 	update_active_effects_panel()
@@ -3761,11 +3830,9 @@ func select_cleric_power(unit: Node2D, power_id: String) -> void:
 func can_select_bard_power(unit: Node2D, power_id: String) -> bool:
 	if not is_instance_valid(unit) or unit != get_acting_unit() or get_unit_class_name(unit) != "Bardo":
 		return false
-	if unit.has_attacked:
-		return false
 	match power_id:
 		"bard_precise_rhythm":
-			return true
+			return not unit.has_attacked
 		"bard_courage_refrain":
 			return not unit.encounter_powers_used.has(power_id)
 		"bard_renewal_song":
@@ -3832,7 +3899,6 @@ func select_bard_power(unit: Node2D, power_id: String) -> void:
 		for ally in wounded_allies:
 			apply_healing_to_unit(ally, healing)
 		show_floating_text_on_unit(unit, "CANÇÃO DE RECOMEÇO", 20, "heal")
-	unit.has_attacked = true
 	clear_attack_area()
 	refresh_action_ui()
 	update_active_effects_panel()
@@ -3849,11 +3915,9 @@ func get_prepared_bard_attack_bonus(unit: Node2D) -> int:
 func can_select_fighter_power(unit: Node2D, power_id: String) -> bool:
 	if not is_instance_valid(unit) or unit != get_acting_unit() or get_unit_class_name(unit) != "Guerreiro":
 		return false
-	if unit.has_attacked:
-		return false
 	match power_id:
 		"fighter_technical_strike":
-			return true
+			return not unit.has_attacked
 		"fighter_steady_stance":
 			return not unit.encounter_powers_used.has(power_id)
 		"fighter_breaking_strike":
@@ -3870,7 +3934,6 @@ func select_fighter_power(unit: Node2D, power_id: String) -> void:
 	if power_id == "fighter_steady_stance":
 		unit.encounter_powers_used.append(power_id)
 		unit.fighter_guard_active = true
-		unit.has_attacked = true
 		show_floating_text_on_unit(unit, "POSTURA FIRME", 20, "utility")
 		clear_attack_area()
 		refresh_action_ui()
@@ -3919,8 +3982,6 @@ func has_wounded_allied_unit() -> bool:
 func can_select_druid_power(unit: Node2D, power_id: String) -> bool:
 	if not is_instance_valid(unit) or unit != get_acting_unit():
 		return false
-	if unit.has_attacked:
-		return false
 	match power_id:
 		"druid_barkguard":
 			return true
@@ -3966,7 +4027,6 @@ func select_druid_power(unit: Node2D, power_id: String) -> void:
 				if int(ally.hp) < int(ally.max_hp):
 					apply_healing_to_unit(ally, healing)
 			show_floating_text_on_unit(unit, "CÍRCULO VITAL", 20, "heal")
-	unit.has_attacked = true
 	clear_attack_area()
 	refresh_action_ui()
 	update_active_effects_panel()
@@ -3982,15 +4042,19 @@ func clear_prepared_class_attack() -> void:
 func can_select_monk_power(unit: Node2D, power_id: String) -> bool:
 	if not is_instance_valid(unit) or unit != get_acting_unit() or get_unit_class_name(unit) != "Monge":
 		return false
+	if power_id == "monk_ki_breath":
+		return current_stage == 4 and is_npc_unit(unit) and unit.npc_id == "Hashagur" and is_class_daily_power_available(unit, power_id)
 	if unit.has_attacked or not is_melee_unit(unit):
 		return false
 	match power_id:
 		"monk_focused_strike":
 			return true
 		"monk_flurry":
-			return not unit.encounter_powers_used.has(power_id)
+			return MonkPowers.is_flurry_unlimited(int(unit.level)) or not unit.encounter_powers_used.has(power_id)
 		"monk_inner_force":
 			return is_class_daily_power_available(unit, power_id)
+		"monk_temple_guard":
+			return current_stage == 4 and is_npc_unit(unit) and unit.npc_id == "Hashagur" and not unit.encounter_powers_used.has(power_id)
 	return false
 
 
@@ -3998,6 +4062,14 @@ func select_monk_power(unit: Node2D, power_id: String) -> void:
 	if is_instance_valid(class_ability_popup):
 		class_ability_popup.hide()
 	if not can_select_monk_power(unit, power_id):
+		return
+	if power_id == "monk_ki_breath":
+		if not consume_class_daily_power(unit, power_id):
+			return
+		apply_healing_to_unit(unit, 20)
+		show_floating_text_on_unit(unit, "FÔLEGO DE KI +20 PV", 19, "heal")
+		refresh_action_ui()
+		update_active_effects_panel()
 		return
 	clear_prepared_class_attack()
 	prepared_class_attack = power_id
@@ -4048,10 +4120,12 @@ func get_prepared_power_range(unit: Node2D) -> float:
 
 
 func can_select_progression_power(unit: Node2D, power_id: String) -> bool:
-	if not is_instance_valid(unit) or unit != get_acting_unit() or unit.has_attacked:
+	if not is_instance_valid(unit) or unit != get_acting_unit():
 		return false
 	var power: Dictionary = ClassPowerProgressionData.get_power_by_id(power_id)
 	if power.is_empty() or str(power.get("class_name", "")) != get_unit_class_name(unit):
+		return false
+	if not bool(power.get("utility", false)) and unit.has_attacked:
 		return false
 	var unlocked: bool = false
 	var selected_powers: Dictionary = unit.selected_class_powers if unit == hero else {}
@@ -4098,7 +4172,6 @@ func select_progression_power(unit: Node2D, power_id: String) -> void:
 			if unit.has_method("update_health_bar"):
 				unit.update_health_bar()
 		unit.current_movement_meters += movement_gain
-		unit.has_attacked = true
 		show_floating_text_on_unit(unit, "+6 m" if movement_gain >= 6.0 else "+%d PV · +3 m" % restored, 20, "heal")
 		show_movement_area()
 		refresh_action_ui()
@@ -4175,6 +4248,12 @@ func perform_flurry_attack(attacker: Node2D) -> void:
 		clear_prepared_class_attack()
 		return
 	if power_id == "monk_flurry":
+		if not MonkPowers.is_flurry_unlimited(int(attacker.level)):
+			if attacker.encounter_powers_used.has(power_id):
+				clear_prepared_class_attack()
+				return
+			attacker.encounter_powers_used.append(power_id)
+	if power_id == "monk_temple_guard":
 		if attacker.encounter_powers_used.has(power_id):
 			clear_prepared_class_attack()
 			return
@@ -4182,6 +4261,8 @@ func perform_flurry_attack(attacker: Node2D) -> void:
 	var attack_bonus: int = get_high_ground_attack_bonus_for_unit(attacker)
 	if power_id == "monk_focused_strike":
 		attack_bonus += 1
+	if power_id == "monk_temple_guard":
+		attack_bonus += 2
 	attack_bonus += get_bard_song_attack_bonus(attacker)
 	if attacker == hero:
 		attack_bonus += hero.get_weapon_attack_bonus()
@@ -4213,6 +4294,8 @@ func perform_flurry_attack(attacker: Node2D) -> void:
 				damage = get_npc_attack_damage(attacker)
 			if power_id == "monk_inner_force":
 				damage += 4
+			if power_id == "monk_temple_guard":
+				damage += 5
 			if bool(result.get("critical_hit", false)):
 				damage *= 2
 			apply_attack_damage_to_unit(target, damage, bool(result.get("critical_hit", false)))
@@ -4755,6 +4838,12 @@ func get_enemy_turn_portrait_path(unit_name: String) -> String:
 		return "res://Assets/Characters/Lobo cultista.png"
 	if name_lower.begins_with("cultista"):
 		return "res://Assets/Characters/Cultista1.png"
+	if name_lower.begins_with("guardião"):
+		return "res://Assets/Characters/Cultista guerreiro.png"
+	if name_lower.begins_with("arqueiro"):
+		return "res://Assets/Characters/Arqueiro cultista.png"
+	if name_lower.begins_with("ebramir"):
+		return "res://Assets/Characters/Ebramir.png"
 	return ""
 
 func create_action_panel() -> void:
@@ -5122,6 +5211,8 @@ func check_battle_result() -> void:
 		
 		if not enemy_unit.visible:
 			continue
+		if current_stage == 4 and enemy_unit.monster_id != "Cultista":
+			continue
 		
 		any_enemy_alive = true
 		break
@@ -5340,6 +5431,17 @@ func on_victory_confirmed() -> void:
 	
 	sync_hero_to_game_state()
 	PartyManager.sync_hero_from_game_state()
+	if current_stage == 4:
+		# Mesmo se o diálogo de vitória for reaberto, nunca pule a cena 10.
+		battle_finished = true
+		if not await play_stage_4_victory_sequence():
+			show_victory()
+		return
+	if current_stage == 5:
+		battle_finished = true
+		if not await play_stage_5_victory_sequence():
+			show_victory()
+		return
 	var bridge_was_completed: bool = (
 		current_stage == 3
 		and MissionManager.is_mission_completed("emerald_bridge")
@@ -5612,6 +5714,8 @@ func update_class_skill_button() -> void:
 	
 	if unit_class in ["Monge", "Bruxo"]:
 		button_disabled = unit.has_attacked
+		if unit_class == "Monge" and can_select_monk_power(unit, "monk_ki_breath"):
+			button_disabled = false
 		if prepared_class_attacker == unit and (prepared_class_attack.begins_with("monk_") or prepared_class_attack.begins_with("warlock_")):
 			button_text = "Escolha o alvo"
 			button_disabled = true
@@ -5776,6 +5880,8 @@ func has_combat_advantage_condition(target_unit: Node2D) -> bool:
 	if is_enemy_unit(target_unit) and target_unit.has_method("has_active_control_effect"):
 		if target_unit.has_active_control_effect(battle_turn_count):
 			return true
+	if target_unit.has_method("has_status_effect") and target_unit.has_status_effect("Derrubado", battle_turn_count):
+		return true
 	var flanking_units: Array[Node2D] = []
 	if is_enemy_unit(target_unit):
 		if is_living_player_ally(hero):
@@ -8321,6 +8427,8 @@ func can_spell_target_unit(
 	
 	if target_unit.hp <= 0:
 		return false
+	if current_stage == 4 and is_instance_valid(hero) and is_target_across_temple_fire(hero, target_unit):
+		return false
 	
 	if effect in [
 		"heal",
@@ -8386,6 +8494,8 @@ func get_spell_area_cells(center_position: Vector2i, radius: int) -> Array:
 			
 			if not is_inside_grid(test_position):
 				continue
+			if current_stage == 4 and test_position.x >= 17:
+				continue
 			
 			var distance_tiles: int = max(
 				abs(test_position.x - center_position.x),
@@ -8420,6 +8530,8 @@ func show_spell_area_preview(center_position: Vector2i, radius: int, feedback_ty
 		create_spell_target_tile(cell, feedback_type)
 func is_spell_cell_in_range(target_position: Vector2i, spell_data: Dictionary) -> bool:
 	if not is_instance_valid(hero):
+		return false
+	if current_stage == 4 and target_position.x >= 17:
 		return false
 	
 	var spell_range: float = get_spell_range_meters(spell_data)
@@ -9356,7 +9468,27 @@ func update_active_effects_panel() -> void:
 	)
 
 func get_enemy_target_unit() -> Node2D:
+	if current_stage == 4 and is_instance_valid(enemy):
+		if enemy.monster_id in ["Ebramir", "Guardião do Culto", "Arqueiro do Culto"]:
+			var hashagur: Node2D = find_scenario_npc_by_id("Hashagur")
+			return hashagur if is_instance_valid(hashagur) and hashagur.hp > 0 else null
+		var nearest: Node2D = null
+		var nearest_distance: float = INF
+		for ally in [hero, animal_companion] + npcs:
+			if not is_instance_valid(ally) or ally.hp <= 0 or not ally.visible:
+				continue
+			if ally.grid_position.x >= 17:
+				continue
+			var distance: float = get_distance_in_meters(enemy.grid_position, ally.grid_position)
+			if distance < nearest_distance:
+				nearest_distance = distance
+				nearest = ally
+		return nearest
 	return EnemyAI.choose_target(enemy, self)
+
+
+func is_target_across_temple_fire(first: Node2D, second: Node2D) -> bool:
+	return current_stage == 4 and is_instance_valid(first) and is_instance_valid(second) and (first.grid_position.x < 17) != (second.grid_position.x < 17)
 
 func get_unit_display_name(unit: Node2D) -> String:
 	if not is_instance_valid(unit):
@@ -9776,7 +9908,14 @@ func should_skip_initiative_unit(
 func prepare_active_initiative_unit(
 	unit: Node2D
 ):
+	if is_instance_valid(current_active_unit) and current_active_unit != unit:
+		var previous_token: Node2D = current_active_unit.get_node_or_null("BattleToken")
+		if is_instance_valid(previous_token):
+			previous_token.set_active(false)
 	current_active_unit = unit
+	var active_token: Node2D = unit.get_node_or_null("BattleToken")
+	if is_instance_valid(active_token):
+		active_token.set_active(true)
 	
 	update_class_skill_button()
 	show_turn_banner_for_unit_if_needed(unit)
@@ -9838,9 +9977,77 @@ func start_enemy_initiative_turn(
 		get_unit_display_name(enemy)
 	)
 	
-	await enemy_turn()
+	if current_stage == 4 and enemy_unit.monster_id == "Ebramir":
+		await _run_ebramir_turn(enemy_unit)
+	else:
+		var attack_limit: int = enemy_unit.get_max_attack_actions() if enemy_unit.has_method("get_max_attack_actions") else 1
+		for attack_index in range(attack_limit):
+			if battle_finished or not is_instance_valid(enemy_unit) or enemy_unit.hp <= 0:
+				break
+			var used_before: int = int(enemy_unit.attacks_used_this_turn)
+			await enemy_turn(attack_index == 0)
+			if int(enemy_unit.attacks_used_this_turn) == used_before:
+				break
 	resolve_enemy_control_at_turn_end(enemy_unit)
 	advance_initiative_turn()
+
+
+func _run_ebramir_turn(caster: Node2D) -> void:
+	var hashagur: Node2D = find_scenario_npc_by_id("Hashagur")
+	if not is_instance_valid(hashagur) or hashagur.hp <= 0:
+		return
+	caster.reset_movement()
+	center_camera_on_unit(caster)
+	await wait_before_action()
+	var spells: Array = TempleDuelData.EBRAMIR_SPELLS
+	for action_index in range(caster.get_max_attack_actions()):
+		if battle_finished or hashagur.hp <= 0 or caster.hp <= 0:
+			break
+		var selected_spell: Dictionary = {}
+		for offset in range(spells.size()):
+			var candidate: Dictionary = spells[(battle_turn_count + action_index + offset - 1) % spells.size()]
+			if caster.has_spell_slot_available(int(candidate["level"])):
+				selected_spell = candidate
+				break
+		if selected_spell.is_empty():
+			break
+		await _cast_ebramir_spell(caster, hashagur, selected_spell)
+
+
+func _cast_ebramir_spell(caster: Node2D, target: Node2D, spell: Dictionary) -> void:
+	var spell_level: int = int(spell["level"])
+	if not caster.consume_spell_slot(spell_level):
+		return
+	var spell_name: String = str(spell["name"])
+	var illusion: bool = str(spell["kind"]) == "illusion"
+	var save_dc: int = int(caster.spell_save_dc_base) + spell_level + (int(caster.illusion_dc_bonus) if illusion else 0)
+	var save_type: String = "will" if illusion else "reflex"
+	var save_bonus: int = int(target.get_will_save_bonus()) if illusion else int(target.get_reflex_save_bonus())
+	var saved: bool = randi_range(1, 20) + save_bonus >= save_dc
+	if UIAudioManager != null:
+		UIAudioManager.play_spell(spell_name, {"effect": "control" if illusion else "damage"})
+	show_spell_visual_on_unit(spell_name, {"visual_kind": "energy"}, target)
+	show_floating_text_on_unit(caster, spell_name.to_upper(), 18, "utility")
+	if illusion:
+		if not saved:
+			target.temporary_attack_bonus = -2
+			target.temporary_effects_end_turn = battle_turn_count + 1
+			target.apply_status_effect("Dúvida", battle_turn_count + 1)
+			show_floating_text_on_unit(target, "DÚVIDA: -2 ATAQUE", 20, "miss")
+		else:
+			show_floating_text_on_unit(target, "RESISTIU À ILUSÃO", 18, "utility")
+	else:
+		var damage: int = int(caster.spell_damage_bonus)
+		for die_index in range(int(spell["dice"])):
+			damage += randi_range(1, int(spell["die"]))
+		if saved:
+			damage = maxi(1, damage / 2)
+		apply_attack_damage_to_unit(target, damage, false)
+		if saved:
+			show_floating_text_on_unit(target, "REFLEXOS: METADE", 18, "utility")
+	caster.has_attacked = true
+	update_active_effects_panel()
+	await get_tree().create_timer(0.35).timeout
 
 func resolve_enemy_control_at_turn_end(enemy_unit: Node2D) -> void:
 	if not is_instance_valid(enemy_unit) or enemy_unit.hp <= 0:
@@ -9959,6 +10166,8 @@ func get_scenario_start_text() -> String:
 	var enemy_count: int = (
 		get_alive_enemy_count()
 	)
+	if current_stage == 4:
+		enemy_count = 5
 	
 	var scenario_name: String = str(
 		current_scenario_data.get(
@@ -10193,11 +10402,9 @@ func spawn_monster(
 		)
 		return null
 	
-	var monster_data: Dictionary = (
-		MonsterDatabase.get_monster_data(
-			monster_name
-		)
-	)
+	var monster_data: Dictionary = TempleDuelData.get_enemy_data(monster_name) if current_stage == 4 else {}
+	if monster_data.is_empty():
+		monster_data = MonsterDatabase.get_monster_data(monster_name)
 	
 	if monster_data.is_empty():
 		print(
@@ -10426,6 +10633,8 @@ func has_enemy_within_weapon_range(unit: Node2D, weapon_range: float) -> bool:
 			continue
 		if target.hp <= 0 or not target.visible:
 			continue
+		if is_target_across_temple_fire(unit, target):
+			continue
 		if get_distance_in_meters(unit.grid_position, target.grid_position) <= weapon_range:
 			return true
 	return false
@@ -10531,7 +10740,7 @@ func get_valid_attack_target_for_unit(attacker: Node2D, preferred_target: Node2D
 	attack_range = get_prepared_power_range(attacker)
 	
 	if is_instance_valid(preferred_target):
-		if preferred_target.hp > 0 and preferred_target.visible:
+		if preferred_target.hp > 0 and preferred_target.visible and not is_target_across_temple_fire(attacker, preferred_target):
 			var preferred_distance: float = get_distance_in_meters(
 				attacker.grid_position,
 				preferred_target.grid_position
@@ -10551,6 +10760,8 @@ func get_valid_attack_target_for_unit(attacker: Node2D, preferred_target: Node2D
 			continue
 		
 		if not enemy_unit.visible:
+			continue
+		if is_target_across_temple_fire(attacker, enemy_unit):
 			continue
 		
 		var distance_to_enemy: float = get_distance_in_meters(
@@ -11404,6 +11615,10 @@ func enemy_attack_target(
 	attack_bonus += int(
 		enemy.temporary_attack_bonus
 	)
+	attack_bonus -= int(enemy.iterative_attack_penalty) * int(enemy.attacks_used_this_turn)
+	var archer_close_shot: bool = enemy.monster_id == "Arqueiro do Culto" and distance_to_target <= 9.0
+	if archer_close_shot:
+		attack_bonus += 1
 	
 	var control_attack_penalty: int = 0
 	
@@ -11467,6 +11682,8 @@ func enemy_attack_target(
 	var critical_hit: bool = bool(
 		attack_result["critical_hit"]
 	)
+	if hit and dice_roll >= int(enemy.critical_threshold):
+		critical_hit = true
 	
 	print("====================================")
 	print("ATAQUE DO INIMIGO")
@@ -11550,6 +11767,8 @@ func enemy_attack_target(
 			damage = int(
 				enemy.roll_total_weapon_damage()
 			)
+		if archer_close_shot:
+			damage += 1
 		
 		if critical_hit:
 			damage *= 2
@@ -11559,6 +11778,13 @@ func enemy_attack_target(
 			damage,
 			critical_hit
 		)
+		if enemy.monster_id == "Guardião do Culto" and target_unit.hp > 0:
+			var trip_total: int = randi_range(1, 20) + int(enemy.trip_bonus)
+			var trip_dc: int = 10 + int(target_unit.get_reflex_save_bonus())
+			if trip_total >= trip_dc:
+				target_unit.apply_status_effect("Derrubado", battle_turn_count + 2)
+				target_unit.current_movement_meters = 0.0
+				show_floating_text_on_unit(target_unit, "DERRUBADO: VANTAGEM +2", 18, "miss")
 		
 		print("Inimigo acertou.")
 		print(
@@ -12263,7 +12489,8 @@ func spawn_npc(
 	npc_id: String,
 	grid_position: Vector2i,
 	instance_display_name: String = "",
-	control_type_override: String = ""
+	control_type_override: String = "",
+	scenario_data_override: Dictionary = {}
 ) -> Node2D:
 	var npc_data: Dictionary = (
 		NpcDatabase.get_npc_data(
@@ -12281,6 +12508,8 @@ func spawn_npc(
 	# Trabalhamos com uma cópia para não alterar
 	# permanentemente os dados do NpcDatabase.
 	npc_data = npc_data.duplicate(true)
+	if not scenario_data_override.is_empty():
+		npc_data = scenario_data_override.duplicate(true)
 
 	var npc_instance := (
 		NPC_SCENE.instantiate()
@@ -12429,7 +12658,8 @@ func setup_scenario_npcs():
 			npc_id,
 			spawn_position,
 			display_name,
-			control_type
+			control_type,
+			TempleDuelData.get_hashagur_data() if current_stage == 4 and npc_id == "Hashagur" else {}
 		)
 	
 	print("NPCs do cenário criados: ", npcs.size())
@@ -12450,6 +12680,10 @@ func start_current_scenario_music():
 			music_path
 		)
 		return
+	if MusicManage != null and is_instance_valid(MusicManage.music_player):
+		var player: AudioStreamPlayer = MusicManage.music_player
+		if player.playing and player.stream != null and player.stream.resource_path == music_path:
+			return
 	
 	var music_volume_percent: float = (
 		ScenarioDatabase.get_scenario_music_volume_percent(
@@ -13262,7 +13496,7 @@ func attack_selected_player_unit():
 	if not is_instance_valid(acting_unit):
 		return
 
-	if prepared_class_attack in ["flurry", "monk_focused_strike", "monk_flurry", "monk_inner_force"] and prepared_class_attacker == acting_unit:
+	if prepared_class_attack in ["flurry", "monk_focused_strike", "monk_flurry", "monk_inner_force", "monk_temple_guard"] and prepared_class_attacker == acting_unit:
 		await perform_flurry_attack(acting_unit)
 		return
 	if prepared_class_attack.begins_with("warlock_") and prepared_class_attacker == acting_unit:
@@ -13971,6 +14205,9 @@ func roll_attack_result(
 			target_ac
 		)
 	)
+	if is_instance_valid(attacker_unit) and "critical_threshold" in attacker_unit:
+		if bool(attack_result["hit"]) and int(attack_result["dice_roll"]) >= int(attacker_unit.critical_threshold):
+			attack_result["critical_hit"] = true
 	attack_result["combat_advantage_bonus"] = advantage_bonus
 	
 	var dice_roll: int = int(
@@ -14808,6 +15045,7 @@ func configure_hero_from_game_state() -> void:
 		hero.get_pending_level_up_count()
 	
 	hero.update_health_bar()
+	hero.refresh_battle_token()
 
 func print_applied_hero_preset():
 	if not is_instance_valid(hero):
@@ -16162,7 +16400,43 @@ func play_scripted_scenario_intro(
 			enemy_unit.update_health_display()
 	active_cinematic_cast = previous_intro_cast
 
+func play_temple_courtyard_intro() -> void:
+	scenario_intro_running = true
+	is_movement_animating = true
+	set_gameplay_panels_visible(false)
+	clear_movement_area()
+	clear_attack_area()
+	if is_instance_valid(temple_courtyard_gate):
+		temple_courtyard_gate.visible = false
+	await focus_camera_on_grid_position(Vector2i(23, 12))
+	for step in TempleBattleOutroData.get_outside():
+		var step_type: String = str(step.get("type", ""))
+		if step_type == "doors_close":
+			if is_instance_valid(temple_courtyard_gate):
+				temple_courtyard_gate.visible = true
+				temple_courtyard_gate.modulate.a = 0.0
+				var gate_tween: Tween = create_tween()
+				gate_tween.tween_property(temple_courtyard_gate, "modulate:a", 1.0, 0.35)
+				await gate_tween.finished
+			continue
+		if step_type != "dialogue":
+			continue
+		var speaker: String = str(step.get("speaker", "Narrador"))
+		var line: String = str(step.get("text", ""))
+		if speaker == "Sir Uiliam" and line == "Não!":
+			var uiliam: Node2D = find_scenario_npc_by_id("Sr Uiliam")
+			await animate_intro_unit_to_grid(uiliam, Vector2i(25, 11), 0.45)
+		await show_story_dialog(get_victory_player_name() if speaker == "Aventureiro" else speaker, line)
+	if not SaveManager.mark_story_event_completed("temple_courtyard_intro_seen"):
+		push_warning("Não foi possível registrar a introdução do pátio.")
+	scenario_intro_running = false
+	is_movement_animating = false
+	camera_follow_unit = null
+
 func play_scenario_intro_sequence() -> void:
+	if current_stage == 5 and not SaveManager.has_completed_story_event("temple_courtyard_intro_seen"):
+		await play_temple_courtyard_intro()
+		return
 	var sequence_data: Dictionary = (
 		ScenarioDatabase.get_scenario_intro_sequence(
 			current_stage
@@ -17110,6 +17384,10 @@ func play_scenario_victory_sequence() -> bool:
 		return await play_stage_2_victory_sequence()
 	if current_stage == 3:
 		return await play_stage_3_victory_sequence()
+	if current_stage == 4:
+		return await play_stage_4_victory_sequence()
+	if current_stage == 5:
+		return await play_stage_5_victory_sequence()
 
 	var sequence_data: Dictionary = (
 		ScenarioDatabase.get_scenario_victory_sequence(
@@ -17215,6 +17493,115 @@ func play_scenario_victory_sequence() -> bool:
 		)
 
 	SceneTransition.change_scene_to_file(next_scene_path, 1.0)
+	return true
+
+
+func play_stage_4_victory_sequence() -> bool:
+	var sequence: Dictionary = ScenarioDatabase.get_stage_4_victory_sequence()
+	var next_scene: String = str(sequence.get("next_scene", ""))
+	if sequence.is_empty() or not ResourceLoader.exists(next_scene):
+		push_warning("A saída do templo não está disponível após a batalha.")
+		return false
+	set_gameplay_panels_visible(false)
+	selected_player_unit = null
+	camera_follow_unit = null
+	is_movement_animating = true
+	clear_movement_area()
+	clear_attack_area()
+	await focus_camera_on_grid_position(Vector2i(10, 11))
+	var focus_side: String = "party"
+	for step in TempleBattleOutroData.get_inside():
+		var step_type: String = str(step.get("type", ""))
+		if step_type == "wind_burst":
+			await _play_hashagur_wind_burst()
+			focus_side = "party"
+			continue
+		if step_type != "dialogue":
+			continue
+		var speaker: String = str(step.get("speaker", "Narrador"))
+		var line: String = str(step.get("text", ""))
+		if speaker == "Hashagur" and focus_side != "hashagur":
+			await focus_camera_on_grid_position(Vector2i(23, 11))
+			focus_side = "hashagur"
+		elif speaker == "Sir Uiliam" and focus_side == "hashagur":
+			await focus_camera_on_grid_position(Vector2i(10, 11))
+			focus_side = "party"
+		await show_story_dialog(get_victory_player_name() if speaker == "Aventureiro" else speaker, line)
+	await process_pending_hero_level_ups()
+	sync_hero_to_game_state()
+	PartyManager.sync_hero_from_game_state()
+	var previous_missions: Dictionary = MissionManager.get_save_data()
+	if MissionManager.is_mission_active("temple_escape_route"):
+		MissionManager.update_mission_description("temple_escape_route", "Hashagur lançou o grupo para fora do templo e permaneceu enfrentando Ebramir.")
+		MissionManager.complete_mission("temple_escape_route")
+	MissionManager.start_mission({
+		"id": "temple_courtyard_defense",
+		"title": "Sobreviva ao ataque",
+		"description": "As portas estão seladas. Elimine os cultistas restantes no pátio externo."
+	})
+	current_stage = 5
+	GameState.selected_stage = 5
+	if not save_auto_game("battle"):
+		current_stage = 4
+		GameState.selected_stage = 4
+		MissionManager.load_save_data(previous_missions)
+		GameState.current_location = "battle"
+		return false
+	if MusicManage != null:
+		MusicManage.fade_out_music(0.8)
+	GameState.should_load_save = true
+	SceneTransition.change_scene_to_file(next_scene, 1.0)
+	return true
+
+
+func _play_hashagur_wind_burst() -> void:
+	await focus_camera_on_grid_position(Vector2i(23, 11))
+	var escaping_units: Array[Node2D] = []
+	if is_instance_valid(hero):
+		escaping_units.append(hero)
+	for npc_id in ["Sr Uiliam", "Aniri", "Kasum"]:
+		var ally: Node2D = find_scenario_npc_by_id(npc_id)
+		if is_instance_valid(ally):
+			escaping_units.append(ally)
+	if is_instance_valid(animal_companion):
+		escaping_units.append(animal_companion)
+	for index in range(escaping_units.size()):
+		var unit: Node2D = escaping_units[index]
+		animate_intro_unit_to_grid(unit, Vector2i(1, 8 + index * 2), 0.58)
+	await focus_camera_on_grid_position(Vector2i(3, 11))
+
+
+func play_stage_5_victory_sequence() -> bool:
+	set_gameplay_panels_visible(false)
+	selected_player_unit = null
+	camera_follow_unit = null
+	is_movement_animating = true
+	clear_movement_area()
+	clear_attack_area()
+	await focus_camera_on_grid_position(Vector2i(24, 12))
+	for step in TempleBattleOutroData.get_after_battle():
+		if str(step.get("type", "")) != "dialogue":
+			continue
+		var speaker: String = str(step.get("speaker", "Narrador"))
+		await show_story_dialog(get_victory_player_name() if speaker == "Aventureiro" else speaker, str(step.get("text", "")))
+	await process_pending_hero_level_ups()
+	sync_hero_to_game_state()
+	PartyManager.sync_hero_from_game_state()
+	var previous_missions: Dictionary = MissionManager.get_save_data()
+	if MissionManager.is_mission_active("temple_courtyard_defense"):
+		MissionManager.complete_mission("temple_courtyard_defense")
+	MissionManager.start_mission({
+		"id": "temple_return_to_village",
+		"title": "Ecos do Templo — Retorne à vila",
+		"description": "O destino de Hashagur é desconhecido. Retorne à vila, descanse e decida o próximo passo."
+	})
+	if not save_auto_game("temple_gate"):
+		MissionManager.load_save_data(previous_missions)
+		GameState.current_location = "battle"
+		return false
+	if MusicManage != null:
+		MusicManage.fade_out_music(0.8)
+	SceneTransition.change_scene_to_file("res://Scene/world_map.tscn", 1.0)
 	return true
 
 func restore_saved_inventory_and_party_state() -> void:

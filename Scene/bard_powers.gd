@@ -12,13 +12,15 @@ const POWERS := [
 		"id": "bard_courage_refrain",
 		"name": "Refrão de Coragem",
 		"frequency": "Por encontro",
-		"description": "Aliados recebem +1 para acertar ataques com armas até o fim da próxima rodada. Usa a ação principal."
+		"utility": true,
+		"description": "Aliados recebem +1 para acertar ataques com armas até o fim da próxima rodada. Ativa ao selecionar, sem gastar ataque."
 	},
 	{
 		"id": "bard_renewal_song",
 		"name": "Canção de Recomeço",
 		"frequency": "Diário",
-		"description": "Cure todos os aliados feridos. Usa a ação principal e volta após descansar."
+		"utility": true,
+		"description": "Cure todos os aliados feridos ao selecionar, sem gastar ataque. Recupera após descansar."
 	}
 ]
 

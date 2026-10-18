@@ -19,12 +19,13 @@ const BEDROOM_CLUE := Vector2i(5, 13)
 const STRATEGY_CLUE := Vector2i(25, 17)
 const CHEST := Vector2i(9, 3)
 const GLASS := [Vector2i(8, 3), Vector2i(1, 7), Vector2i(1, 17), Vector2i(20, 21)]
+const CORRIDOR_COVER := [Rect2(1110, 445, 82, 86), Rect2(1275, 850, 76, 84)]
 
 const GUARDS := [
 	{"name": "Cultista 1", "role": "Corredor oeste", "start": Vector2i(13, 5), "route": [Vector2i(13, 5), Vector2i(15, 5), Vector2i(15, 9), Vector2i(13, 9)]},
-	{"name": "Cultista 2", "role": "Corredor central", "start": Vector2i(18, 16), "route": [Vector2i(18, 16), Vector2i(19, 19), Vector2i(17, 19), Vector2i(17, 13)]},
+	{"name": "Cultista 2", "role": "Cozinha e fim do corredor", "start": Vector2i(18, 20), "route": [Vector2i(18, 20), Vector2i(16, 20), Vector2i(13, 20), Vector2i(13, 22), Vector2i(17, 22)]},
 	{"name": "Cultista 3", "role": "Cozinha", "start": Vector2i(2, 20), "route": [Vector2i(2, 20), Vector2i(2, 22), Vector2i(9, 22), Vector2i(11, 22)]},
-	{"name": "Cultista 4", "role": "Corredor dos dormitórios", "start": Vector2i(19, 8), "route": [Vector2i(19, 8), Vector2i(19, 12), Vector2i(20, 12), Vector2i(20, 8)]}
+	{"name": "Cultista 4", "role": "Corredor central", "start": Vector2i(19, 8), "route": [Vector2i(19, 4), Vector2i(19, 18)]}
 ]
 
 const WALLS := [
@@ -38,7 +39,12 @@ const WALLS := [
 	# Parede longa que separa os dois corredores principais.
 	Rect2(1040, 240, 58, 950),
 	# Ala dos dormitórios: abertura ao norte da curva.
-	Rect2(1375, 240, 55, 710), Rect2(1400, 934, 600, 58),
+	Rect2(1375, 200, 55, 710), Rect2(1400, 894, 600, 58),
+	# Arcos de pedra quebrados na entrada; o vão entre eles continua livre.
+	Rect2(1400, 175, 76, 95), Rect2(1460, 145, 105, 75),
+	Rect2(1540, 145, 90, 65), Rect2(1610, 160, 55, 80),
+	Rect2(1750, 188, 65, 78), Rect2(1795, 145, 90, 75),
+	Rect2(1860, 115, 110, 70),
 	# Sala da mesa e seis tocos: entrada a leste da parede curva.
 	Rect2(1375, 947, 55, 310),
 	Rect2(1400, 1260, 170, 60), Rect2(1550, 1235, 110, 58),
@@ -54,6 +60,8 @@ const FURNITURE := [
 	# Cama, mesa e caixas do quarto da primeira pista.
 	Rect2(175, 535, 205, 175), Rect2(175, 745, 110, 205),
 	Rect2(625, 555, 118, 145),
+	# Caixotes do corredor: as casas livres ao lado deles são esconderijos.
+	CORRIDOR_COVER[0], CORRIDOR_COVER[1],
 	# Camas dos dormitórios.
 	Rect2(1430, 270, 210, 185), Rect2(1430, 465, 185, 195),
 	Rect2(1460, 665, 185, 185), Rect2(1770, 260, 185, 205),
@@ -86,6 +94,22 @@ static func blocked(cell: Vector2i) -> bool:
 	return false
 
 
+static func can_step(from_cell: Vector2i, to_cell: Vector2i) -> bool:
+	if blocked(from_cell) or blocked(to_cell) or absi(from_cell.x - to_cell.x) + absi(from_cell.y - to_cell.y) != 1:
+		return false
+	var start: Vector2 = cell_center(from_cell)
+	var finish: Vector2 = cell_center(to_cell)
+	for index in range(1, 8):
+		var sample: Vector2 = start.lerp(finish, float(index) / 8.0)
+		for obstacle in WALLS:
+			if obstacle.has_point(sample):
+				return false
+		for obstacle in FURNITURE:
+			if obstacle.has_point(sample):
+				return false
+	return true
+
+
 static func distance_meters(a: Vector2i, b: Vector2i) -> float:
 	return Vector2(a).distance_to(Vector2(b)) * METERS_PER_TILE
 
@@ -95,7 +119,7 @@ static func observe_succeeds(observe_roll: int, observe_bonus: int, hide_roll: i
 	return observe_roll + observe_bonus >= hide_roll + hide_bonus
 
 
-static func has_line_of_sight(a: Vector2i, b: Vector2i) -> bool:
+static func has_line_of_sight(a: Vector2i, b: Vector2i, corridor_cover_blocks: bool = false) -> bool:
 	if not inside(a) or not inside(b):
 		return false
 	if a == b:
@@ -110,9 +134,12 @@ static func has_line_of_sight(a: Vector2i, b: Vector2i) -> bool:
 	for wall in WALLS:
 		if wall.intersects(bounds):
 			occluders.append(wall)
-	for furniture in FURNITURE:
-		if furniture.intersects(bounds):
-			occluders.append(furniture)
+	# Móveis baixos oferecem cobertura, mas não apagam o que está atrás deles.
+	# Os caixotes do corredor ocultam a Aniri da visão dos cultistas.
+	if corridor_cover_blocks:
+		for crate in CORRIDOR_COVER:
+			if crate.intersects(bounds):
+				occluders.append(crate)
 	var steps: int = maxi(1, ceili(from_point.distance_to(to_point) / 8.0))
 	for index in range(1, steps):
 		var sample: Vector2 = from_point.lerp(to_point, float(index) / float(steps))
@@ -122,8 +149,8 @@ static func has_line_of_sight(a: Vector2i, b: Vector2i) -> bool:
 	return true
 
 
-static func can_see(viewer: Vector2i, target: Vector2i, range_meters: float) -> bool:
-	return distance_meters(viewer, target) <= range_meters and has_line_of_sight(viewer, target)
+static func can_see(viewer: Vector2i, target: Vector2i, range_meters: float, corridor_cover_blocks: bool = false) -> bool:
+	return distance_meters(viewer, target) <= range_meters and has_line_of_sight(viewer, target, corridor_cover_blocks)
 
 
 static func cover_near(cell: Vector2i) -> bool:
@@ -166,7 +193,7 @@ static func path(from_cell: Vector2i, to_cell: Vector2i, occupied: Array[Vector2
 			break
 		for direction in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
 			var neighbor: Vector2i = current + direction
-			if blocked(neighbor) or neighbor in occupied or parents.has(neighbor):
+			if not can_step(current, neighbor) or neighbor in occupied or parents.has(neighbor):
 				continue
 			parents[neighbor] = current
 			frontier.append(neighbor)
@@ -177,6 +204,25 @@ static func path(from_cell: Vector2i, to_cell: Vector2i, occupied: Array[Vector2
 		result.push_front(step)
 		step = parents[step]
 	return result
+
+
+static func reachable_cells(from_cell: Vector2i, max_steps: int, occupied: Array[Vector2i] = []) -> Dictionary:
+	var distances: Dictionary = {from_cell: 0}
+	var frontier: Array[Vector2i] = [from_cell]
+	var head: int = 0
+	while head < frontier.size():
+		var current: Vector2i = frontier[head]
+		head += 1
+		if distances[current] >= max_steps:
+			continue
+		for direction in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+			var neighbor: Vector2i = current + direction
+			if not can_step(current, neighbor) or neighbor in occupied or distances.has(neighbor):
+				continue
+			distances[neighbor] = distances[current] + 1
+			frontier.append(neighbor)
+	distances.erase(from_cell)
+	return distances
 
 
 static func adjacent_or_same(a: Vector2i, b: Vector2i) -> bool:
@@ -194,7 +240,12 @@ static func validate_layout() -> Array[String]:
 	for guard in GUARDS:
 		if blocked(guard["start"]):
 			errors.append("Cultista bloqueado: %s" % str(guard["name"]))
-		for waypoint in guard["route"]:
+		var route: Array = guard["route"]
+		for index in range(route.size()):
+			var waypoint: Vector2i = route[index]
 			if blocked(waypoint):
 				errors.append("Rota bloqueada: %s %s" % [guard["name"], str(waypoint)])
+			var next_waypoint: Vector2i = route[(index + 1) % route.size()]
+			if waypoint != next_waypoint and path(waypoint, next_waypoint).is_empty():
+				errors.append("Patrulha sem passagem: %s %s → %s" % [guard["name"], str(waypoint), str(next_waypoint)])
 	return errors

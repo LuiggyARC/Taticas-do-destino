@@ -5,6 +5,8 @@ const GATE_MAP_PATH := "res://Assets/Maps/Chegada ao templo.jpg"
 const TEMPLE_MUSIC_PATH := "res://Assets/Audio/Moonlight_on_Empty_Wood.mp3"
 const ARRIVAL_EVENT_ID := "temple_hashagur_arrival"
 const MISSION_ID := "hashagur_temple"
+const ESCAPE_MISSION_ID := "temple_escape_route"
+const COURTYARD_MISSION_ID := "temple_courtyard_defense"
 
 var objective_label: Label
 var enter_button: Button
@@ -17,10 +19,16 @@ var hashagur_portrait: Control
 
 func _ready() -> void:
 	GameState.current_location = "temple_gate"
+	if MissionManager.is_mission_active(COURTYARD_MISSION_ID):
+		call_deferred("_start_courtyard_battle")
+		return
 	_build_background()
 	_build_character_stage()
 	_build_header()
 	_play_temple_music()
+	if MissionManager.is_mission_completed(ESCAPE_MISSION_ID):
+		_show_after_battle()
+		return
 	if SaveManager.has_completed_story_event(ARRIVAL_EVENT_ID):
 		_show_arrived_cast()
 		_show_entrance()
@@ -268,7 +276,21 @@ func _show_entrance() -> void:
 	enter_button.visible = true
 
 
+func _show_after_battle() -> void:
+	_show_arrived_cast()
+	hashagur_portrait.visible = false
+	objective_label.text = "Ecos do Templo — retorne à vila e descanse"
+	enter_button.text = "Mapa do mundo"
+	enter_button.visible = true
+
+
 func _on_enter_pressed() -> void:
+	if MissionManager.is_mission_active(COURTYARD_MISSION_ID):
+		_start_courtyard_battle()
+		return
+	if MissionManager.is_mission_completed(ESCAPE_MISSION_ID):
+		SceneTransition.change_scene_to_file("res://Scene/world_map.tscn")
+		return
 	if not SaveManager.has_completed_story_event(ARRIVAL_EVENT_ID) and not _save_arrival():
 		objective_label.text = "Não foi possível salvar. Tente entrar novamente."
 		return
@@ -283,6 +305,34 @@ func _on_enter_pressed() -> void:
 		return
 	GameState.current_location = "temple_hall"
 	SceneTransition.change_scene_to_file("res://Scene/temple_hall.tscn")
+
+
+func _start_courtyard_battle() -> void:
+	var save_path: String = SaveManager.get_active_save_path()
+	var save_data: Dictionary = SaveManager.read_save_data(save_path)
+	if save_data.is_empty():
+		push_warning("Não foi possível abrir o save para continuar o ataque.")
+		_show_courtyard_retry("Não foi possível abrir o save. Tente novamente.")
+		return
+	save_data["current_stage"] = 5
+	save_data["current_location"] = "battle"
+	if not SaveManager.write_save_data(save_path, save_data):
+		push_warning("Não foi possível salvar o início do combate. Tente novamente.")
+		_show_courtyard_retry("Não foi possível salvar o combate. Tente novamente.")
+		return
+	GameState.selected_stage = 5
+	GameState.current_location = "battle"
+	GameState.should_load_save = true
+	SceneTransition.change_scene_to_file("res://Scene/main.tscn")
+
+
+func _show_courtyard_retry(message: String) -> void:
+	if not is_instance_valid(objective_label):
+		_build_background()
+		_build_header()
+	objective_label.text = message
+	enter_button.text = "Tentar novamente"
+	enter_button.visible = true
 
 
 func _on_menu_pressed() -> void:
