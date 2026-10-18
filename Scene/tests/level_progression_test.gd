@@ -4,6 +4,7 @@ const Progression = preload("res://Scene/level_progression.gd")
 const Powers = preload("res://Scene/class_power_progression.gd")
 const HeroScript = preload("res://Scene/units/hero.gd")
 const MainScript = preload("res://Scene/main.gd")
+const LevelUpPanelScript = preload("res://Scene/level_up_panel.gd")
 
 
 func _ready() -> void:
@@ -61,6 +62,38 @@ func _ready() -> void:
 	assert(int(preview["new_xp_threshold"]) == 3750)
 	assert(int(preview["feat_choice_count"]) >= 1)
 	hero.free()
+
+	var wizard: Node2D = HeroScript.new()
+	wizard.character_class = "Mago"
+	wizard.character_race = "Humano"
+	wizard.level = 1
+	wizard.max_level = 30
+	wizard.hp_progression_mode = "roll"
+	var wizard_level_2: Dictionary = level_manager.get_level_up_preview(wizard, 2)
+	assert(int(wizard_level_2["new_spell_slots"][1]) == int(wizard_level_2["current_spell_slots"][1]) + 1)
+	assert(int(wizard_level_2["new_spell_slots"][2]) == 0)
+	assert(int(wizard_level_2["spell_choice_count"]) == 2)
+	var wizard_level_3: Dictionary = level_manager.get_level_up_preview(wizard, 3)
+	assert(int(wizard_level_3["new_spell_slots"][2]) > 0)
+	assert(wizard_level_3["available_spells"].has("Estilhaços Arcanos"))
+	assert(wizard_level_3["available_spells"].has("Barreira de Runas"))
+	var level_panel: LevelUpPanel = LevelUpPanelScript.new()
+	add_child(level_panel)
+	level_panel.open_for_hero(wizard, 2)
+	assert(not level_panel.feat_option_buttons.is_empty())
+	var first_feat: OptionButton = level_panel.feat_option_buttons[0]
+	first_feat.select(1)
+	level_panel.on_level_up_feat_selected(1, 0)
+	assert(level_panel.feat_description_labels[0].text.contains(FeatDatabase.get_feat_description(first_feat.get_item_text(1))))
+	level_panel.on_roll_hp_button_pressed()
+	assert(level_panel.hp_rolling)
+	assert(level_panel.rolled_hp_die == 0)
+	await get_tree().create_timer(1.4).timeout
+	assert(not level_panel.hp_rolling)
+	assert(level_panel.rolled_hp_die >= 1)
+	assert(not level_panel.confirm_button.disabled)
+	level_panel.free()
+	wizard.free()
 
 	var choice_hero: Node2D = HeroScript.new()
 	choice_hero.character_class = "Guerreiro"

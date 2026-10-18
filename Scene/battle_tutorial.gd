@@ -13,9 +13,12 @@ var card: PanelContainer
 var title_label: Label
 var body_label: Label
 var progress_label: Label
+var target_hint_label: Label
 var back_button: Button
+var skip_button: Button
 var next_button: Button
 var arrow_label: Label
+var preferred_card_width: float = 820.0 if OS.has_feature("mobile") else 650.0
 
 func _ready() -> void:
 	name = "BattleTutorial"
@@ -28,7 +31,7 @@ func _ready() -> void:
 func build_card() -> void:
 	card = PanelContainer.new()
 	card.name = "TutorialCard"
-	card.custom_minimum_size.x = 820 if OS.has_feature("mobile") else 650
+	card.custom_minimum_size.x = preferred_card_width
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.025, 0.035, 0.045, 0.98)
 	style.border_color = Color(0.95, 0.76, 0.34)
@@ -48,14 +51,22 @@ func build_card() -> void:
 	content.add_child(progress_label)
 
 	title_label = Label.new()
-	title_label.add_theme_font_size_override("font_size", 25 if not OS.has_feature("mobile") else 34)
+	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title_label.add_theme_font_size_override("font_size", 25 if not OS.has_feature("mobile") else 31)
 	content.add_child(title_label)
+	content.add_child(HSeparator.new())
 
 	body_label = Label.new()
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body_label.custom_minimum_size.y = 70 if not OS.has_feature("mobile") else 100
-	body_label.add_theme_font_size_override("font_size", 19 if not OS.has_feature("mobile") else 27)
+	body_label.custom_minimum_size.y = 65 if not OS.has_feature("mobile") else 88
+	body_label.add_theme_font_size_override("font_size", 19 if not OS.has_feature("mobile") else 24)
 	content.add_child(body_label)
+
+	target_hint_label = Label.new()
+	target_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	target_hint_label.add_theme_font_size_override("font_size", 15 if not OS.has_feature("mobile") else 19)
+	target_hint_label.add_theme_color_override("font_color", Color(0.98, 0.80, 0.42))
+	content.add_child(target_hint_label)
 
 	var actions := HBoxContainer.new()
 	actions.alignment = BoxContainer.ALIGNMENT_END
@@ -64,19 +75,21 @@ func build_card() -> void:
 
 	back_button = Button.new()
 	back_button.text = "Voltar"
-	back_button.custom_minimum_size = Vector2(110, 48)
+	back_button.custom_minimum_size = Vector2(78, 62 if OS.has_feature("mobile") else 50)
 	back_button.pressed.connect(previous_step)
 	actions.add_child(back_button)
 
-	var skip_button := Button.new()
-	skip_button.text = "Pular tutorial"
-	skip_button.custom_minimum_size = Vector2(160, 48)
+	skip_button = Button.new()
+	skip_button.text = "Pular" if OS.has_feature("mobile") else "Pular tutorial"
+	skip_button.custom_minimum_size = Vector2(100 if OS.has_feature("mobile") else 150, 62 if OS.has_feature("mobile") else 50)
 	skip_button.pressed.connect(skip_tutorial)
 	actions.add_child(skip_button)
 
 	next_button = Button.new()
 	next_button.text = "Próximo"
-	next_button.custom_minimum_size = Vector2(135, 48)
+	next_button.custom_minimum_size = Vector2(120, 62 if OS.has_feature("mobile") else 50)
+	next_button.add_theme_stylebox_override("normal", create_primary_button_style(false))
+	next_button.add_theme_stylebox_override("hover", create_primary_button_style(true))
 	next_button.pressed.connect(next_step)
 	actions.add_child(next_button)
 
@@ -86,6 +99,16 @@ func build_card() -> void:
 	arrow_label.add_theme_color_override("font_color", Color(1.0, 0.80, 0.30))
 	arrow_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(arrow_label)
+
+
+func create_primary_button_style(hovered: bool) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.18, 0.38, 0.25) if hovered else Color(0.09, 0.26, 0.18)
+	style.border_color = Color(0.55, 0.94, 0.64)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(7)
+	style.set_content_margin_all(8)
+	return style
 
 func start_tutorial(new_steps: Array[Dictionary], resolver: Callable) -> void:
 	if new_steps.is_empty():
@@ -103,7 +126,11 @@ func show_step() -> void:
 	progress_label.text = str(step.get("progress_text", "TUTORIAL  %d / %d" % [step_index + 1, steps.size()]))
 	title_label.text = str(step.get("title", "Dica de combate"))
 	body_label.text = str(step.get("text", ""))
+	target_hint_label.text = str(step.get("hint", "Observe a área destacada no cenário."))
+	target_hint_label.visible = not str(step.get("target", "")).is_empty()
 	back_button.disabled = step_index == 0
+	back_button.visible = steps.size() > 1
+	skip_button.visible = bool(step.get("allow_skip", true))
 	next_button.text = str(step.get(
 		"button_text",
 		"Entendi" if step_index == steps.size() - 1 else "Próximo"
@@ -153,17 +180,22 @@ func update_target() -> void:
 				if rect is Rect2 and rect.has_area():
 					area_rects.append(rect)
 	var screen_size: Vector2 = get_viewport_rect().size
-	var card_width: float = minf(card.custom_minimum_size.x, screen_size.x - 24.0)
+	var narrow_screen: bool = screen_size.x < 500.0
+	back_button.custom_minimum_size.x = 70.0 if narrow_screen else 78.0
+	skip_button.custom_minimum_size.x = 80.0 if narrow_screen else (100.0 if OS.has_feature("mobile") else 150.0)
+	skip_button.text = "Pular" if narrow_screen or OS.has_feature("mobile") else "Pular tutorial"
+	next_button.custom_minimum_size.x = 95.0 if narrow_screen else 120.0
+	var card_width: float = minf(preferred_card_width, maxf(0.0, screen_size.x - 24.0))
 	card.custom_minimum_size.x = card_width
 	card.reset_size()
 	card.position.x = (screen_size.x - card.size.x) * 0.5
 	if not area_rects.is_empty():
 		card.position.y = 14.0
-	elif target_rect.has_area() and target_rect.get_center().y > screen_size.y * 0.54:
+	elif target_rect.has_area() and target_rect.get_center().y >= screen_size.y * 0.48:
 		card.position.y = 14.0
 	else:
 		card.position.y = screen_size.y - card.size.y - 14.0
-	card.position.y = maxf(14.0, card.position.y)
+	card.position.y = clampf(card.position.y, 14.0, maxf(14.0, screen_size.y - card.size.y - 14.0))
 	arrow_label.visible = target_rect.has_area()
 	if arrow_label.visible:
 		arrow_label.position = Vector2(

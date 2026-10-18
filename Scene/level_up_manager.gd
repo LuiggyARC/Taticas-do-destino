@@ -545,7 +545,7 @@ func get_spell_slot_limits(
 					)
 				)
 		
-		"Clérigo", "Druida", "Mago":
+		"Clérigo", "Druida":
 			slots[0] = min(
 				5,
 				3 + int(
@@ -567,6 +567,13 @@ func get_spell_slot_limits(
 						(safe_level - 3) / 2
 					)
 				)
+
+		"Mago":
+			slots[0] = min(5, 3 + int((safe_level - 1) / 4))
+			# O nível 2 aumenta os usos de círculo 1; o círculo 2 abre no nível 3.
+			slots[1] = min(5, 2 + int(safe_level / 2))
+			if safe_level >= 3:
+				slots[2] = min(4, 1 + int((safe_level - 3) / 2))
 		
 		"Feiticeiro":
 			slots[0] = min(

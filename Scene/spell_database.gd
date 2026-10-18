@@ -289,6 +289,39 @@ var spells := {
 		"duration": 1
 	},
 
+	"Estilhaços Arcanos": {
+		"level": 2,
+		"classes": ["Mago"],
+		"description": "Fragmentos de energia atingem inimigos em uma pequena área, causando 3d6 de dano mágico.",
+		"effect": "damage",
+		"spell_type": "damage",
+		"type": "damage",
+		"target": "enemy",
+		"is_area": true,
+		"range_meters": 12.0,
+		"area_radius": 1,
+		"value_dice": 6,
+		"value_dice_count": 3,
+		"flat_bonus": 0
+	},
+
+	"Barreira de Runas": {
+		"level": 2,
+		"classes": ["Mago"],
+		"description": "Runas defensivas concedem +3 de CA ao conjurador por 4 turnos.",
+		"effect": "buff",
+		"spell_type": "buff",
+		"type": "buff",
+		"target": "self",
+		"range_meters": 0.0,
+		"area_radius": 0,
+		"attack_bonus": 0,
+		"damage_bonus": 0,
+		"armor_bonus": 3,
+		"movement_bonus": 0.0,
+		"duration": 4
+	},
+
 	"Curar Ferimentos Moderados": {
 		"level": 2,
 		"classes": ["Bardo", "Clérigo", "Druida"],

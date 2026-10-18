@@ -19,6 +19,9 @@ const KasumTavernDatabaseScript := preload(
 const VillageDrinkingDiceScript := preload(
 	"res://Scene/village_drinking_dice.gd"
 )
+const BattleTutorialScript := preload(
+	"res://Scene/battle_tutorial.gd"
+)
 const HealerNightDatabaseScript := preload(
 	"res://Scene/healer_night_database.gd"
 )
@@ -148,7 +151,7 @@ var healer_night_running: bool = false
 var temple_button: Button
 var world_map_button: Button
 var temple_departure_running: bool = false
-var central_square_tutorial: AcceptDialog
+var central_square_tutorial: Control
 
 
 func consume_pending_village_return_location() -> String:
@@ -2097,23 +2100,29 @@ func show_central_square_tutorial() -> void:
 	if is_instance_valid(central_square_tutorial) and central_square_tutorial.visible:
 		return
 	if not is_instance_valid(central_square_tutorial):
-		central_square_tutorial = AcceptDialog.new()
+		central_square_tutorial = BattleTutorialScript.new()
 		central_square_tutorial.name = "CentralSquareTutorial"
-		central_square_tutorial.title = "Como organizar sua equipe"
-		central_square_tutorial.dialog_text = (
-			"Toda cidade tem uma Praça Central. Toque nela para ver seus "
-			+ "companheiros e adicionar ou remover membros da equipe "
-			+ "antes de partir para a próxima missão."
-		)
-		central_square_tutorial.dialog_autowrap = true
-		central_square_tutorial.ok_button_text = "Entendi"
-		central_square_tutorial.get_ok_button().custom_minimum_size = Vector2(210, 64)
-		central_square_tutorial.get_label().add_theme_font_size_override("font_size", 23 if OS.has_feature("mobile") else 18)
-		central_square_tutorial.confirmed.connect(complete_central_square_tutorial)
+		central_square_tutorial.closed.connect(complete_central_square_tutorial)
 		central_square_tutorial.visibility_changed.connect(update_central_square_tutorial_highlight)
 		add_child(central_square_tutorial)
-	central_square_tutorial.popup_centered(Vector2i(620, 230))
+	central_square_tutorial.move_to_front()
+	var steps: Array[Dictionary] = [{
+		"title": "Prepare sua equipe na Praça Central",
+		"text": "A área destacada abre a formação do grupo. Escolha quem acompanhará o herói antes de partir; você pode voltar à praça para trocar companheiros depois.",
+		"target": "central_square",
+		"progress_text": "EXPLORAÇÃO · PRAÇA CENTRAL",
+		"button_text": "Abrir formação",
+		"allow_skip": false
+	}]
+	central_square_tutorial.start_tutorial(steps, Callable(self, "get_central_square_tutorial_target_rect"))
 	update_central_square_tutorial_highlight()
+
+
+func get_central_square_tutorial_target_rect(_target_name: String) -> Rect2:
+	var square_button: Button = location_buttons.get("central_square") as Button
+	if is_instance_valid(square_button):
+		return square_button.get_global_rect()
+	return Rect2()
 
 
 func update_central_square_tutorial_highlight() -> void:
@@ -2130,8 +2139,11 @@ func update_central_square_tutorial_highlight() -> void:
 	)
 
 
-func complete_central_square_tutorial() -> void:
+func complete_central_square_tutorial(completed: bool) -> void:
+	if not completed:
+		return
 	SaveManager.mark_story_event_completed(CENTRAL_SQUARE_TUTORIAL_EVENT_ID)
+	call_deferred("open_party_formation_panel")
 func play_village_music() -> void:
 	if MusicManage == null:
 		return

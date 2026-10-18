@@ -1141,14 +1141,18 @@ func show_stage_two_tactical_tutorial() -> void:
 	stage_two_tutorial_shown = true
 	var steps: Array[Dictionary] = [
 		{
-			"title": "Proteja a retaguarda",
-			"text": "Coloque combatentes como Sir Uiliam à frente: mais pontos de vida e uma CA maior ajudam a suportar os golpes. Deixe aliados mais frágeis atrás deles.",
-			"target": "frontliner"
+			"title": "Forme a linha de frente",
+			"text": "Leve Sir Uiliam à frente. Sua vida e sua Classe de Armadura (CA) ajudam a resistir aos golpes. Mantenha os aliados mais frágeis atrás dele.",
+			"target": "frontliner",
+			"hint": "Observe Sir Uiliam; cada aliado agirá no próprio turno.",
+			"progress_text": "PORÃO DE JHON · 1/2"
 		},
 		{
-			"title": "Flanqueie o Rato Atroz",
-			"text": "O Rato Atroz tem CA 16. Coloque dois aliados adjacentes em lados opostos dele: o rato ficará Flanqueado e concederá Vantagem de Combate. Enquanto isso durar, todos os aliados recebem +2 para acertá-lo, mesmo à distância. Ladinos também podem usar ataque furtivo.",
-			"target": "dire_rat"
+			"title": "Flanqueie: +2 para acertar",
+			"text": "O Rato Atroz tem CA 16. Posicione dois aliados em lados opostos, junto dele. Assim, ele concede Vantagem de Combate: todos recebem +2 para acertá-lo, inclusive à distância. Um ladino também pode fazer Ataque Furtivo.",
+			"target": "dire_rat",
+			"hint": "Se um aliado sair da posição, o flanqueio termina.",
+			"progress_text": "PORÃO DE JHON · 2/2"
 		}
 	]
 	battle_tutorial_controller.start_tutorial(steps, Callable(self, "get_tutorial_target_rect"))

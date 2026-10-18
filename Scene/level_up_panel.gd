@@ -28,6 +28,7 @@ var confirm_button: Button
 var feat_selection_container: VBoxContainer
 var feat_option_buttons: Array[OptionButton] = []
 var feat_detail_buttons: Array[OptionButton] = []
+var feat_description_labels: Array[Label] = []
 var attribute_option_buttons: Array[OptionButton] = []
 var power_choice_cards: Dictionary = {}
 var power_choice_buttons: Dictionary = {}
@@ -37,10 +38,13 @@ var selected_power_id: String = ""
 var spell_section: VBoxContainer
 var spell_list: ItemList
 var spell_instruction_label: Label
+var spell_description_label: Label
 
 var rolled_hp_die: int = 0
 var calculated_hp_gain: int = 0
 var required_spell_choices: int = 0
+var hp_rolling: bool = false
+var hp_roll_generation: int = 0
 
 
 func _ready() -> void:
@@ -78,10 +82,8 @@ func create_interface() -> void:
 	window_panel.set_anchors_preset(
 		Control.PRESET_CENTER
 	)
-	window_panel.offset_left = -420.0
-	window_panel.offset_top = -430.0
-	window_panel.offset_right = 420.0
-	window_panel.offset_bottom = 430.0
+	update_window_bounds()
+	get_viewport().size_changed.connect(update_window_bounds)
 	window_panel.add_theme_stylebox_override(
 		"panel",
 		create_panel_style()
@@ -202,6 +204,18 @@ func create_interface() -> void:
 	main_container.add_child(confirm_button)
 
 
+func update_window_bounds() -> void:
+	if not is_instance_valid(window_panel):
+		return
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var panel_width: float = minf(840.0, maxf(320.0, viewport_size.x - 24.0))
+	var panel_height: float = minf(860.0, maxf(320.0, viewport_size.y - 24.0))
+	window_panel.offset_left = -panel_width * 0.5
+	window_panel.offset_right = panel_width * 0.5
+	window_panel.offset_top = -panel_height * 0.5
+	window_panel.offset_bottom = panel_height * 0.5
+
+
 func open_for_hero(
 	new_hero_unit: Node,
 	target_level: int = -1
@@ -232,11 +246,14 @@ func hide_panel() -> void:
 
 
 func reset_selections() -> void:
+	hp_roll_generation += 1
+	hp_rolling = false
 	rolled_hp_die = 0
 	calculated_hp_gain = 0
 	required_spell_choices = 0
 	feat_option_buttons.clear()
 	feat_detail_buttons.clear()
+	feat_description_labels.clear()
 	attribute_option_buttons.clear()
 	power_choice_cards.clear()
 	power_choice_buttons.clear()
@@ -738,6 +755,11 @@ func create_feat_section() -> void:
 		)
 		
 		return
+	var feat_hint := Label.new()
+	feat_hint.text = "Selecione um talento para ler o benefício. Você pode mudar a escolha antes de confirmar."
+	feat_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	feat_hint.add_theme_color_override("font_color", Color(0.73, 0.82, 0.77))
+	feat_selection_container.add_child(feat_hint)
 	
 	for choice_data_value in feat_choices:
 		var choice_data: Dictionary = (
@@ -762,7 +784,7 @@ func create_feat_section() -> void:
 		var feat_option := OptionButton.new()
 		feat_option.custom_minimum_size = Vector2(
 			0,
-			42
+			64 if OS.has_feature("mobile") else 46
 		)
 		feat_option.add_item(
 			"Selecione um talento..."
@@ -780,8 +802,11 @@ func create_feat_section() -> void:
 		)
 		
 		for feat_name_value in available_feats:
-			feat_option.add_item(
-				str(feat_name_value)
+			var feat_name: String = str(feat_name_value)
+			feat_option.add_item(feat_name)
+			feat_option.get_popup().set_item_tooltip(
+				feat_option.item_count - 1,
+				FeatDatabase.get_feat_description(feat_name)
 			)
 		
 		feat_option_buttons.append(
@@ -796,12 +821,34 @@ func create_feat_section() -> void:
 		detail_option.visible = false
 		feat_detail_buttons.append(detail_option)
 		feat_selection_container.add_child(detail_option)
+		var feat_description := Label.new()
+		feat_description.text = "Benefício: selecione um talento acima."
+		feat_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		feat_description.add_theme_font_size_override("font_size", 16)
+		feat_description.add_theme_color_override("font_color", Color(0.85, 0.86, 0.80))
+		feat_selection_container.add_child(feat_description)
+		feat_description_labels.append(feat_description)
 		var slot_index: int = feat_option_buttons.size() - 1
 		feat_option.item_selected.connect(on_level_up_feat_selected.bind(slot_index))
 
 
 func on_level_up_feat_selected(_selected: int, slot_index: int) -> void:
 	update_feat_detail_option(slot_index)
+	update_feat_description(slot_index)
+	validation_label.text = ""
+
+
+func update_feat_description(slot_index: int) -> void:
+	if slot_index < 0 or slot_index >= feat_option_buttons.size():
+		return
+	var feat_option: OptionButton = feat_option_buttons[slot_index]
+	var description_label: Label = feat_description_labels[slot_index]
+	if feat_option.selected <= 0:
+		description_label.text = "Benefício: selecione um talento acima."
+		return
+	var feat_name: String = feat_option.get_item_text(feat_option.selected)
+	var description: String = FeatDatabase.get_feat_description(feat_name)
+	description_label.text = "Benefício: " + (description if not description.is_empty() else "Descrição indisponível.")
 
 
 func update_feat_detail_option(slot_index: int) -> void:
@@ -933,6 +980,7 @@ func create_spell_section() -> void:
 			if required_spell_choices == 1
 			else " magias."
 		)
+		+ " Toque em uma magia para ver seu efeito."
 	)
 	spell_instruction_label.add_theme_font_size_override(
 		"font_size",
@@ -954,9 +1002,16 @@ func create_spell_section() -> void:
 		ItemList.SELECT_MULTI
 	)
 	spell_list.allow_reselect = true
+	spell_list.multi_selected.connect(on_level_up_spell_selected)
 	spell_section.add_child(
 		spell_list
 	)
+	spell_description_label = Label.new()
+	spell_description_label.text = "Selecione uma magia para ver sua descrição."
+	spell_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	spell_description_label.add_theme_font_size_override("font_size", 16)
+	spell_description_label.add_theme_color_override("font_color", Color(0.85, 0.86, 0.80))
+	spell_section.add_child(spell_description_label)
 	
 	for spell_name_value in available_spells:
 		var spell_name: String = str(
@@ -986,6 +1041,14 @@ func create_spell_section() -> void:
 			spell_list.item_count - 1,
 			spell_name
 		)
+
+
+func on_level_up_spell_selected(index: int, _selected: bool) -> void:
+	if not is_instance_valid(spell_list) or not is_instance_valid(spell_description_label):
+		return
+	var spell_name: String = str(spell_list.get_item_metadata(index))
+	var spell_data: Dictionary = SpellDatabase.get_spell_data(spell_name)
+	spell_description_label.text = spell_name + " — " + str(spell_data.get("description", "Descrição indisponível."))
 
 
 func create_section_panel(
@@ -1090,7 +1153,7 @@ func create_section_style() -> StyleBoxFlat:
 
 
 func on_roll_hp_button_pressed() -> void:
-	if rolled_hp_die > 0:
+	if rolled_hp_die > 0 or hp_rolling:
 		return
 	
 	var hit_die: int = max(
@@ -1110,17 +1173,27 @@ func on_roll_hp_button_pressed() -> void:
 		)
 	)
 	
-	rolled_hp_die = randi_range(
-		1,
-		hit_die
-	)
-	
-	calculated_hp_gain = max(
-		1,
-		rolled_hp_die
-		+ constitution_modifier
-	)
-	
+	# O resultado é sorteado uma única vez; os quadros seguintes são apenas visuais.
+	var final_roll: int = randi_range(1, hit_die)
+	hp_rolling = true
+	roll_hp_button.disabled = true
+	roll_hp_button.text = "Rolando..."
+	confirm_button.disabled = true
+	animate_hp_roll(final_roll, hit_die, constitution_modifier, hp_roll_generation)
+
+
+func animate_hp_roll(final_roll: int, hit_die: int, constitution_modifier: int, generation: int) -> void:
+	for frame in range(12):
+		if generation != hp_roll_generation or not is_inside_tree():
+			return
+		hp_result_label.text = "1d%d  •  %d" % [hit_die, randi_range(1, hit_die)]
+		hp_result_label.add_theme_font_size_override("font_size", 24 if frame % 2 == 0 else 20)
+		await get_tree().create_timer(0.045 + float(frame) * 0.008).timeout
+	if generation != hp_roll_generation or not is_inside_tree():
+		return
+	rolled_hp_die = final_roll
+	calculated_hp_gain = max(1, final_roll + constitution_modifier)
+	hp_result_label.add_theme_font_size_override("font_size", 20)
 	hp_result_label.text = (
 		"1d"
 		+ str(hit_die)
@@ -1136,13 +1209,16 @@ func on_roll_hp_button_pressed() -> void:
 	)
 	if str(hero_unit.character_race) == "Anão":
 		hp_result_label.text += " +1 Sangue de Ferro"
-	
-	roll_hp_button.disabled = true
 	roll_hp_button.text = "Vida rolada"
+	hp_rolling = false
+	confirm_button.disabled = false
 
 
 func on_confirm_button_pressed() -> void:
 	validation_label.text = ""
+	if hp_rolling:
+		validation_label.text = "Aguarde o fim da rolagem de vida."
+		return
 	
 	if not validate_hp_selection():
 		return
